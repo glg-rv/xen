@@ -35,6 +35,7 @@
 #include <asm/setup.h>
 
 #ifdef CONFIG_X86
+#include <asm/debugger.h>
 #include <xen/consoled.h>
 #include <asm/guest.h>
 #endif
@@ -1270,7 +1271,9 @@ void panic(const char *fmt, ...)
 
     spin_unlock_irqrestore(&lock, flags);
 
+#ifdef CONFIG_X86
     debugger_trap_immediate();
+#endif
 
     kexec_crash(CRASHREASON_PANIC);
 
