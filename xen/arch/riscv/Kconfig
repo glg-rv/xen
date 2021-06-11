@@ -1,5 +1,8 @@
 config RISCV
 	def_bool y
+	select HAS_PDX
+	select HAS_PASSTHROUGH
+	select HAS_DEVICE_TREE
 
 config RISCV_64
 	def_bool y
@@ -7,7 +10,7 @@ config RISCV_64
 
 config ARCH_DEFCONFIG
 	string
-	default "arch/riscv/configs/tiny64_defconfig"
+	default "arch/riscv/configs/riscv64_defconfig" if RISCV_64
 
 menu "Architecture Features"
 
@@ -40,8 +43,9 @@ config RISCV_ISA_C
 	  in the Xen binary.
 
 	  If unsure, say Y.
-
 endmenu
+
+source "arch/riscv/platforms/Kconfig"
 
 source "common/Kconfig"
 
