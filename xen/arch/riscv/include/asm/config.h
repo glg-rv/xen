@@ -40,8 +40,8 @@
 #endif
 
 #define BYTES_PER_LONG (1 << LONG_BYTEORDER)
-#define BITS_PER_LONG (BYTES_PER_LONG << 3)
-#define POINTER_ALIGN BYTES_PER_LONG
+#define BITS_PER_LONG  (BYTES_PER_LONG << 3)
+#define POINTER_ALIGN  BYTES_PER_LONG
 
 #define BITS_PER_LLONG 64
 
@@ -101,8 +101,6 @@
 
 #define CONFIG_PAGING_LEVELS 3
 
-#define CONFIG_RISCV 1
-
 #define CONFIG_PAGEALLOC_MAX_ORDER 18
 #define CONFIG_DOMU_MAX_ORDER      9
 #define CONFIG_HWDOM_MAX_ORDER     10
@@ -132,63 +130,49 @@
 #define FRAMETABLE_NR          (FRAMETABLE_SIZE / sizeof(*frame_table))
 #define FRAMETABLE_VIRT_END    (FRAMETABLE_VIRT_START + FRAMETABLE_SIZE - 1)
 
-#ifndef ASM_NL
-#define ASM_NL		 ;
-#endif
-
 /**
  * All RISC-V implementations (except for with C extension) enforce 32-bit
  * instruction address alignment.  With C extension, 16-bit and 32-bit are
  * both allowed.
  */
 #ifndef __ALIGN
-#define __ALIGN	    .align 4
-#define __ALIGN_STR	".align 4"
+#define __ALIGN     .align 4
+#define __ALIGN_STR ".align 4"
 #endif
 
 /* Linkage for RISCV */
 #ifdef __ASSEMBLY__
-
 #define ALIGN __ALIGN
 #define ALIGN_STR __ALIGN_STR
 
-#ifndef GLOBAL
-#define GLOBAL(name) \
-	.globl name ASM_NL \
-	name:
-#endif
+#define ENTRY(name)                                \
+  .globl name;                                     \
+  ALIGN;                                           \
+  name:
 
-#ifndef ENTRY
-#define ENTRY(name) \
-	.globl name ASM_NL \
-	ALIGN ASM_NL \
-	name:
-#endif
+#define GLOBAL(name)                               \
+  .globl name;                                     \
+  name:
 
-#ifndef WEAK
-#define WEAK(name)	   \
-	.weak name ASM_NL   \
-	ALIGN ASM_NL \
-	name:
-#endif
+#define WEAK(name)                                 \
+  .weak name;                                      \
+  ALIGN;                                           \
+  name:
 
-#ifndef END
-#define END(name) \
-	.size name, .-name
-#endif
+#define END(name)                                  \
+  .size name, .-name
 
 /* If symbol 'name' is treated as a subroutine (gets called, and returns)
  * then please use ENDPROC to mark 'name' as STT_FUNC for the benefit of
  * static analysis tools such as stack depth analyzer.
  */
-#ifndef ENDPROC
-#define ENDPROC(name) \
-	.type name, @function ASM_NL \
-	END(name)
-#endif
+#define ENDPROC(name)                              \
+  .type name, @function                            \
+  END(name)
 
 #define __PAGE_ALIGNED_DATA	.section ".data..page_aligned", "aw"
 #define __PAGE_ALIGNED_BSS	.section ".bss..page_aligned", "aw"
+#endif
 
 #endif /* __RISCV_CONFIG_H__ */
 /*
