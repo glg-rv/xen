@@ -91,10 +91,10 @@ struct bhdr {
 
 struct xmem_pool {
     /* First level bitmap (REAL_FLI bits) */
-    u32 fl_bitmap;
+    unsigned long fl_bitmap;
 
     /* Second level bitmap */
-    u32 sl_bitmap[REAL_FLI];
+    unsigned long sl_bitmap[REAL_FLI];
 
     /* Free lists */
     struct bhdr *matrix[REAL_FLI][MAX_SLI];
@@ -174,7 +174,7 @@ static inline void MAPPING_INSERT(unsigned long r, int *fl, int *sl)
 static inline struct bhdr *FIND_SUITABLE_BLOCK(struct xmem_pool *p, int *fl,
                                                int *sl)
 {
-    u32 tmp = p->sl_bitmap[*fl] & (~0u << *sl);
+    unsigned long tmp = p->sl_bitmap[*fl] & (~0u << *sl);
     struct bhdr *b = NULL;
 
     if ( tmp )
