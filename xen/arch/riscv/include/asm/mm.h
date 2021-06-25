@@ -123,6 +123,9 @@ struct page_info
 #define PGC_count_width   PG_shift(9)
 #define PGC_count_mask    ((1UL<<PGC_count_width)-1)
 
+#define _PGC_extra        PG_shift(10)
+#define PGC_extra         PG_mask(1, 10)
+
 extern mfn_t xenheap_mfn_start, xenheap_mfn_end;
 extern vaddr_t xenheap_virt_end;
 extern vaddr_t xenheap_virt_start;
