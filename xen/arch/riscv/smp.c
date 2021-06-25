@@ -10,7 +10,7 @@ volatile unsigned long start_secondary_pen_release = HARTID_INVALID;
 /* tp points to one of these per cpu */
 struct pcpu_info pcpu_info[NR_CPUS];
 
-void flush_tlb_mask(const cpumask_t *mask)
+void arch_flush_tlb_mask(const cpumask_t *mask)
 {
     /* TODO */
     BUG();

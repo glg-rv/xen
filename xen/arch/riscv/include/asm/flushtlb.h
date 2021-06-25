@@ -19,7 +19,7 @@ static inline void page_set_tlbflush_timestamp(struct page_info *page)
 }
 
 /* Flush specified CPUs' TLBs */
-void flush_tlb_mask(const cpumask_t *mask);
+void arch_flush_tlb_mask(const cpumask_t *mask);
 
 /* Flush local TLBs, current VMID only */
 static inline void flush_guest_tlb_local(void)
