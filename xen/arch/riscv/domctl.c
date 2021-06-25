@@ -30,7 +30,6 @@ long arch_do_domctl(struct xen_domctl *domctl, struct domain *d,
     case XEN_DOMCTL_cacheflush:
     case XEN_DOMCTL_bind_pt_irq:
     case XEN_DOMCTL_unbind_pt_irq:
-    case XEN_DOMCTL_disable_migrate:
     case XEN_DOMCTL_vuart_op:
     default:
         return 0;
