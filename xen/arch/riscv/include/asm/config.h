@@ -2,6 +2,8 @@
 #define __RISCV_CONFIG_H__
 
 #include <xen/const.h>
+#include <xen/page-size.h>
+#include <asm/page-bits.h>
 
 /*
  * RISC-V Layout:
@@ -55,20 +57,6 @@
 
 #define OPT_CONSOLE_STR "dtuart"
 #define INVALID_VCPU_ID MAX_VIRT_CPUS
-
-#ifdef CONFIG_RISCV_64
-#define PADDR_BITS              39
-#else
-#define PADDR_BITS              32
-#endif
-#define PADDR_MASK              ((1ULL << PADDR_BITS)-1)
-
-#define VADDR_BITS              32
-#define VADDR_MASK              (~0UL)
-
-#define PAGE_SHIFT	(12)
-#define PAGE_SIZE	(_AC(1, UL) << PAGE_SHIFT)
-#define PAGE_MASK	(~(PAGE_SIZE - 1))
 
 #ifdef CONFIG_RISCV_64
 

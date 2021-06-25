@@ -8,6 +8,7 @@
 #include <xen/errno.h>
 
 #include <asm/current.h>
+#include <asm/page-bits.h>
 
 #define paddr_bits PADDR_BITS
 
