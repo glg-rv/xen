@@ -341,3 +341,9 @@ struct page_info *get_page_from_gfn(struct domain *d, unsigned long gfn,
 
     return page;
 }
+
+int set_foreign_p2m_entry(struct domain *d, const struct domain *fd,
+                          unsigned long gfn, mfn_t mfn)
+{
+    return -EOPNOTSUPP;
+}
