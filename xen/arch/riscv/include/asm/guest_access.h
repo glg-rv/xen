@@ -75,17 +75,6 @@ unsigned long riscv_vcpu_unpriv_read(struct vcpu *vcpu,
     ((XEN_GUEST_HANDLE_PARAM(const_##type)) { (const type *)ptr })
 
 /*
- * Copy an array of objects to guest context via a guest handle,
- * specifying an offset into the guest array.
- */
-#define copy_to_guest_offset(hnd, off, ptr, nr) ({      \
-    const typeof(*(ptr)) *_s = (ptr);                   \
-    char (*_d)[sizeof(*_s)] = (void *)(hnd).p;          \
-    ((void)((hnd).p == (ptr)));                         \
-    raw_copy_to_guest(_d+(off), _s, sizeof(*_s)*(nr));  \
-})
-
-/*
  * Clear an array of objects in guest context via a guest handle,
  * specifying an offset into the guest array.
  */
@@ -105,13 +94,6 @@ unsigned long riscv_vcpu_unpriv_read(struct vcpu *vcpu,
 })
 
 /* Copy sub-field of a structure to guest context via a guest handle. */
-#define copy_field_to_guest(hnd, ptr, field) ({         \
-    const typeof(&(ptr)->field) _s = &(ptr)->field;     \
-    void *_d = &(hnd).p->field;                         \
-    ((void)(&(hnd).p->field == &(ptr)->field));         \
-    raw_copy_to_guest(_d, _s, sizeof(*_s));             \
-})
-
 /* Copy sub-field of a structure from guest context via a guest handle. */
 #define copy_field_from_guest(ptr, hnd, field) ({       \
     const typeof(&(ptr)->field) _s = &(hnd).p->field;   \
@@ -125,30 +107,6 @@ unsigned long riscv_vcpu_unpriv_read(struct vcpu *vcpu,
  */
 #define guest_handle_okay(hnd, nr) (1)
 #define guest_handle_subrange_okay(hnd, first, last) (1)
-
-#define __copy_to_guest_offset(hnd, off, ptr, nr) ({    \
-    const typeof(*(ptr)) *_s = (ptr);                   \
-    char (*_d)[sizeof(*_s)] = (void *)(hnd).p;          \
-    ((void)((hnd).p == (ptr)));                         \
-    __raw_copy_to_guest(_d+(off), _s, sizeof(*_s)*(nr));\
-})
-
-#define __clear_guest_offset(hnd, off, ptr, nr) ({      \
-    __raw_clear_guest(_d+(off), nr);  \
-})
-
-#define __copy_from_guest_offset(ptr, hnd, off, nr) ({  \
-    const typeof(*(ptr)) *_s = (hnd).p;                 \
-    typeof(*(ptr)) *_d = (ptr);                         \
-    __raw_copy_from_guest(_d, _s+(off), sizeof(*_d)*(nr));\
-})
-
-#define __copy_field_to_guest(hnd, ptr, field) ({       \
-    const typeof(&(ptr)->field) _s = &(ptr)->field;     \
-    void *_d = &(hnd).p->field;                         \
-    ((void)(&(hnd).p->field == &(ptr)->field));         \
-    __raw_copy_to_guest(_d, _s, sizeof(*_s));           \
-})
 
 #define __copy_field_from_guest(ptr, hnd, field) ({     \
     const typeof(&(ptr)->field) _s = &(hnd).p->field;   \
