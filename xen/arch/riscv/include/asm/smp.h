@@ -61,6 +61,7 @@ static inline unsigned int __raw_smp_processor_id(void)
 }
 
 #define raw_smp_processor_id() (__raw_smp_processor_id())
+#define smp_processor_id() (__raw_smp_processor_id())
 
 void smp_clear_cpu_maps (void);
 int smp_get_max_cpus(void);
