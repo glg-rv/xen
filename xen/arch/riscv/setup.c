@@ -271,8 +271,6 @@ void __init start_xen(paddr_t fdt_start)
 
     vm_init();
 
-    softirq_init();
-
     tasklet_subsys_init();
 
     do_presmp_initcalls();
