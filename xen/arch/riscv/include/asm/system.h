@@ -40,6 +40,8 @@
 #define smp_mb()	RISCV_FENCE(rw,rw)
 #define smp_rmb()	RISCV_FENCE(r,r)
 #define smp_wmb()	RISCV_FENCE(w,w)
+#define smp_mb__before_atomic()    smp_mb()
+#define smp_mb__after_atomic()     smp_mb()
 
 #define __smp_store_release(p, v)					\
 do {									\
