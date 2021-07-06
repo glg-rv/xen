@@ -324,7 +324,7 @@ void share_xen_page_with_guest(struct page_info *page, struct domain *d,
 }
 
 int xenmem_add_to_physmap_one(struct domain *d, unsigned int space,
-                              union xen_add_to_physmap_batch_extra extra,
+                              union add_to_physmap_extra extra,
                               unsigned long idx, gfn_t gfn)
 {
     /* TODO */
