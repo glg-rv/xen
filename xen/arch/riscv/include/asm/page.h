@@ -157,6 +157,12 @@ static inline int invalidate_dcache_va_range(const void *p, unsigned long size)
 	return 0;
 }
 
+static inline int clean_dcache_va_range(const void *p, unsigned long size)
+{
+	/* TODO */
+	return 0;
+}
+
 static inline int clean_and_invalidate_dcache_va_range
     (const void *p, unsigned long size)
 {
