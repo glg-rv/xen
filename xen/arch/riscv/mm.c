@@ -626,28 +626,42 @@ void __init setup_xenheap_mappings(unsigned long base_mfn,
     asm volatile("sfence.vma");
 }
 
-void __init clear_pagetables(unsigned long load_addr, unsigned long linker_addr)
+#define resolve_early_addr(x) \
+    ({                                                                          \
+         unsigned long * __##x;                                                 \
+        if ( load_addr_start <= x && x < load_addr_end )                        \
+            __##x = (unsigned long *)x;                                         \
+        else                                                                    \
+            __##x = (unsigned long *)(x + load_addr_start - linker_addr_start); \
+        __##x;                                                                  \
+     })
+
+void __init clear_pagetables(unsigned long load_addr_start,
+                             unsigned long load_addr_end,
+                             unsigned long linker_addr_start,
+                             unsigned long linker_addr_end)
 {
     unsigned long *p;
     unsigned long page;
     unsigned long i;
 
     page = (unsigned long)&xen_second_pagetable[0];
-    p = (unsigned long *)(page + load_addr - linker_addr);
+
+    p = resolve_early_addr(page);
     for ( i = 0; i < ARRAY_SIZE(xen_second_pagetable); i++ )
     {
         p[i] = 0ULL;
     }
 
     page = (unsigned long)&xen_first_pagetable[0];
-    p = (unsigned long *)(page + load_addr - linker_addr);
+    p = resolve_early_addr(page);
     for ( i = 0; i < ARRAY_SIZE(xen_first_pagetable); i++ )
     {
         p[i] = 0ULL;
     }
 
     page = (unsigned long)&xen_zeroeth_pagetable[0];
-    p = (unsigned long *)(page + load_addr - linker_addr);
+    p = resolve_early_addr(page);
     for ( i = 0; i < ARRAY_SIZE(xen_zeroeth_pagetable); i++ )
     {
         p[i] = 0ULL;
@@ -752,7 +766,8 @@ _setup_initial_pagetables(unsigned long load_addr_start,
     pte_t *first;
     pte_t *zeroeth;
 
-    clear_pagetables(load_addr_start, linker_addr_start);
+    clear_pagetables(load_addr_start, load_addr_end,
+                     linker_addr_start, linker_addr_end);
 
     /* Get the addresses where the page tables were loaded */
     second = (pte_t *)load_addr(&xen_second_pagetable);
