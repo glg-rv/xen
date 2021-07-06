@@ -135,6 +135,7 @@ ENTRY(__context_switch)
 	REG_L	sp, VCPU_SAVED_CONTEXT_OFFSET(sp)(a1)
 	REG_L	ra, VCPU_SAVED_CONTEXT_OFFSET(pc)(a1)
     ret
+ENDPROC(__context_switch)
 
 ENTRY(__riscv_unpriv_trap)
 	/*
@@ -157,4 +158,4 @@ ENTRY(__riscv_unpriv_trap)
 	csrr	a1, CSR_HTINST
 	REG_S	a1, RISCV_TRAP_OFFSET(htinst)(a0)
 	sret
-ENDPROC(__riscv_unpriv_trap)
+END(__riscv_unpriv_trap)
