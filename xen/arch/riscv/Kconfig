@@ -45,6 +45,9 @@ config RISCV_ISA_C
 	  If unsure, say Y.
 endmenu
 
+config HVM
+        def_bool y
+
 source "arch/riscv/platforms/Kconfig"
 
 source "common/Kconfig"
