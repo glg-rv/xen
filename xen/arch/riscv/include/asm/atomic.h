@@ -19,17 +19,25 @@
 
 void __bad_atomic_size(void);
 
+static always_inline void read_atomic_size(const volatile void *p,
+                                           void *res,
+                                           unsigned int size)
+{
+    switch ( size ) {
+    case 1: *(uint8_t *)res = readb((uint8_t *)p); break;
+    case 2: *(uint16_t *)res = readw((uint16_t *)p); break;
+    case 4: *(uint32_t *)res = readl((uint32_t *)p); break;
+    case 8: *(uint32_t *)res  = readq((uint64_t *)p); break;
+    default: __bad_atomic_size(); break;
+    }
+}
+
 #define read_atomic(p) ({                                               \
-    typeof(*p) __x;                                                     \
-    switch ( sizeof(*p) ) {                                             \
-    case 1: __x = (typeof(*p))readb((uint8_t *)p); break;               \
-    case 2: __x = (typeof(*p))readw((uint16_t *)p); break;              \
-    case 4: __x = (typeof(*p))readl((uint32_t *)p); break;              \
-    case 8: __x = (typeof(*p))readq((uint64_t *)p); break;              \
-    default: __x = 0; __bad_atomic_size(); break;                       \
-    }                                                                   \
-    __x;                                                                \
+    union { typeof(*p) val; char c[0]; } x_;                            \
+    read_atomic_size(p, x_.c, sizeof(*p));                              \
+    x_.val;                                                             \
 })
+
 
 #define write_atomic(p, x) ({                                           \
     typeof(*p) __x = (x);                                               \
