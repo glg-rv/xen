@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2012 Regents of the University of California
+ * Copyright (C) 2021 Vates
  *
  *   This program is free software; you can redistribute it and/or
  *   modify it under the terms of the GNU General Public License
@@ -54,6 +55,13 @@ struct task_struct;
 extern const struct bug_frame __start_bug_frames[],
                               __stop_bug_frames_0[],
                               __stop_bug_frames_1[],
-                              __stop_bug_frames_2[];
+                              __stop_bug_frames_2[],
+                              __stop_bug_frames_3[];
+
+#define run_in_exception_handler(fn) do {                                   \
+        asm ("add a0, %0, zero"                                             \
+                :: "r" (fn));                                               \
+        BUG();                                                              \
+    } while( 0 )
 
 #endif /* _ASM_RISCV_BUG_H */
