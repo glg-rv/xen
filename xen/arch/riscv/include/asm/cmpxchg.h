@@ -309,8 +309,8 @@
 #define __cmpxchg(ptr, old, new, size)					\
 ({									\
 	__typeof__(ptr) __ptr = (ptr);					\
-	__typeof__(*(ptr)) __old = (old);				\
-	__typeof__(*(ptr)) __new = (new);				\
+	__typeof__(*(ptr)) __old = (__typeof__(*(ptr)))(old);				\
+	__typeof__(*(ptr)) __new = (__typeof__(*(ptr)))(new);				\
 	__typeof__(*(ptr)) __ret;					\
 	register unsigned int __rc;					\
 	switch (size) {							\
