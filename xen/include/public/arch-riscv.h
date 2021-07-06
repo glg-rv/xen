@@ -142,6 +142,8 @@ DEFINE_XEN_GUEST_HANDLE(vcpu_guest_context_t);
 struct xen_arch_domainconfig {
 };
 
+#endif
+
 struct arch_vcpu_info {
 };
 typedef struct arch_vcpu_info arch_vcpu_info_t;
@@ -152,7 +154,6 @@ typedef struct arch_shared_info arch_shared_info_t;
 
 typedef uint64_t xen_callback_t;
 
-#endif
 
 /* Maximum number of virtual CPUs in legacy multi-processor guests. */
 /* Only one. All other VCPUS must use VCPUOP_register_vcpu_info */
