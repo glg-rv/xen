@@ -1,4 +1,4 @@
-subdir-y += lib
+obj-y += lib/
 
 obj-y   += domctl.o
 obj-y   += domain.o
@@ -31,8 +31,21 @@ DEPS += .head.o.d
 $(TARGET): $(TARGET)-syms
 	$(OBJCOPY) -O binary -S $< $@
 
-prelink.o: $(ALL_OBJS)
-	$(LD) $(LDFLAGS) -r -o $@ $^
+#prelink.o: $(ALL_OBJS)
+#	$(LD) $(LDFLAGS) -r -o $@ $^
+
+ifeq ($(CONFIG_LTO),y)
+# Gather all LTO objects together
+prelink_lto.o: $(ALL_OBJS) $(ALL_LIBS)
+	$(LD_LTO) -r -o $@ $(filter-out %.a,$^) --start-group $(filter %.a,$^) --end-group
+
+# Link it with all the binary objects
+prelink.o: $(patsubst %/built_in.o,%/built_in_bin.o,$(ALL_OBJS)) prelink_lto.o
+	$(call if_changed,ld)
+else
+prelink.o: $(ALL_OBJS) $(ALL_LIBS) FORCE
+	$(call if_changed,ld)
+endif
 
 $(TARGET)-syms: prelink.o xen.lds
 	$(LD) $(LDFLAGS) -T xen.lds -N prelink.o \
@@ -56,9 +69,10 @@ asm-offsets.s: asm-offsets.c
 	$(CC) $(filter-out -flto,$(CFLAGS)) -S -o $@ $<
 
 xen.lds: xen.lds.S
-	$(CC) -P -E -Ui386 $(AFLAGS) -o $@ $<
-	sed -e 's/xen\.lds\.o:/xen\.lds:/g' <.xen.lds.d >.xen.lds.d.new
-	mv -f .xen.lds.d.new .xen.lds.d
+	$(CC) -P -E $(a_flags) -D__LINKER__ -MQ $@ -o $@ $<
+	#$(CC) -P -E -Ui386 $(a_flags) -o $@ $<
+	#sed -e 's/xen\.lds\.o:/xen\.lds:/g' <.xen.lds.d >.xen.lds.d.new
+	#mv -f .xen.lds.d.new .xen.lds.d
 
 .PHONY: clean
 clean::
