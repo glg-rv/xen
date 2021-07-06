@@ -79,6 +79,9 @@ void startup_cpu_idle_loop(void)
     ASSERT(is_idle_vcpu(v));
 
     reset_stack_and_jump(idle_loop);
+
+    /* This function is noreturn */
+    while (1);
 }
 
 static __used void init_done(void)
