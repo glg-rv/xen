@@ -648,7 +648,7 @@ static void ns16550_init_common(struct ns16550 *uart)
     uart->lsr_mask  = UART_LSR_THRE;
 }
 
-#ifdef CONFIG_X86
+#ifndef CONFIG_ARM
 
 static int __init parse_parity_char(int c)
 {
