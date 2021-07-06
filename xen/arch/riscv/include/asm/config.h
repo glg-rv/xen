@@ -133,30 +133,40 @@
 #define ALIGN __ALIGN
 #define ALIGN_STR __ALIGN_STR
 
-#define ENTRY(name)                                \
-  .globl name;                                     \
-  ALIGN;                                           \
+#define ENTRY(name)                                     \
+  .globl name;                                          \
+  ALIGN;                                                \
   name:
 
-#define GLOBAL(name)                               \
-  .globl name;                                     \
+#define GLOBAL(name)                                    \
+  .globl name;                                          \
   name:
 
-#define WEAK(name)                                 \
-  .weak name;                                      \
-  ALIGN;                                           \
+#define WEAK(name)                                      \
+  .weak name;                                           \
+  ALIGN;                                                \
   name:
 
-#define END(name)                                  \
+#define END(name)                                       \
   .size name, .-name
+
+#ifndef ASM_NL
+#define ASM_NL		 ;
+#endif
+
+#define SYM_END(name, sym_type)				            \
+  .type name sym_type ASM_NL			                \
+  .size name, .-name
+
+#define SYM_FUNC_END(name)				                \
+  SYM_END(name, STT_FUNC)
 
 /* If symbol 'name' is treated as a subroutine (gets called, and returns)
  * then please use ENDPROC to mark 'name' as STT_FUNC for the benefit of
  * static analysis tools such as stack depth analyzer.
  */
-#define ENDPROC(name)                              \
-  .type name, @function                            \
-  END(name)
+#define ENDPROC(name) \
+  SYM_FUNC_END(name)
 
 #define __PAGE_ALIGNED_DATA	.section ".data..page_aligned", "aw"
 #define __PAGE_ALIGNED_BSS	.section ".bss..page_aligned", "aw"
