@@ -35,6 +35,12 @@ void vm_event_monitor_next_interrupt(struct vcpu *v)
     BUG();
 }
 
+void vm_event_reset_vmtrace(struct vcpu *v)
+{
+    /* TODO */
+    BUG();
+}
+
 /*
  * Local variables:
  * mode: C

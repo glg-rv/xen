@@ -58,4 +58,6 @@ void vm_event_sync_event(struct vcpu *v, bool value)
     /* Not supported on RISCV. */
 }
 
+void vm_event_reset_vmtrace(struct vcpu *v);
+
 #endif /* __ASM_RISCV_VM_EVENT_H__ */
