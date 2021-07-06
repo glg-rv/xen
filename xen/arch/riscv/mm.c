@@ -1157,6 +1157,12 @@ paddr_t __virt_to_maddr(vaddr_t va)
     return maddr;
 }
 
+int guest_physmap_mark_populate_on_demand(struct domain *d, unsigned long gfn,
+                                          unsigned int order)
+{
+    return 0;
+}
+
 /*
  * Local variables:
  * mode: C
