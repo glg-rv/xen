@@ -289,6 +289,12 @@ static inline bool vcpu_has_cache_enabled(struct vcpu *v)
     return 0;
 }
 
+static inline bool arch_acquire_resource_check(struct domain *d)
+{
+    BUG(); /* unimplemented */
+    return true;
+}
+
 #endif /* _XEN_P2M_H */
 
 /*
