@@ -28,6 +28,9 @@ static void context_switch_to_guest(struct vcpu *n)
     hedeleg |= (1U << CAUSE_STORE_PAGE_FAULT);
     hedeleg |= (1U << EXCP_LOAD_GUEST_PAGE_FAULT);
     csr_write(CSR_HEDELEG, hedeleg);
+
+    /* Enable all timers for guest */
+    csr_write(CSR_HCOUNTEREN, -1UL);
 }
 
 void context_switch(struct vcpu *prev, struct vcpu *next)

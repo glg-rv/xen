@@ -407,7 +407,7 @@
 #define CSR_HIE				0x604
 #define CSR_HTIMEDELTA			0x605
 #define CSR_HTIMEDELTAH			0x615
-#define CSR_HCOUNTERNEN			0x606
+#define CSR_HCOUNTEREN			0x606
 #define CSR_HTVAL			0x643
 #define CSR_HIP				0x644
 #define CSR_HTINST			0x64a
