@@ -93,6 +93,7 @@ static __used void init_done(void)
 static unsigned int __initdata max_cpus = NR_CPUS;
 
 struct bootinfo __initdata bootinfo;
+domid_t max_init_domid = 0;
 
 struct domain *xen_dom;
 
@@ -101,86 +102,12 @@ atomic_t hart_lottery;
 unsigned long boot_cpu_hartid;
 unsigned long total_pages;
 
-/*
- * boot_cmdline_find_by_kind can only be used to return Xen modules (e.g
- * XSM, DTB) or Dom0 modules. This is not suitable for looking up guest
- * modules.
- */
-struct bootcmdline * __init boot_cmdline_find_by_kind(bootmodule_kind kind)
-{
-    struct bootcmdlines *cmds = &bootinfo.cmdlines;
-    struct bootcmdline *cmd;
-    int i;
-
-    for ( i = 0 ; i < cmds->nr_mods ; i++ )
-    {
-        cmd = &cmds->cmdline[i];
-        if ( cmd->kind == kind && !cmd->domU )
-            return cmd;
-    }
-    return NULL;
-}
-
-struct bootcmdline * __init boot_cmdline_find_by_name(const char *name)
-{
-    struct bootcmdlines *mods = &bootinfo.cmdlines;
-    struct bootcmdline *mod;
-    unsigned int i;
-
-    for (i = 0 ; i < mods->nr_mods ; i++ )
-    {
-        mod = &mods->cmdline[i];
-        if ( strcmp(mod->dt_name, name) == 0 )
-            return mod;
-    }
-    return NULL;
-}
-
-struct bootmodule * __init boot_module_find_by_addr_and_kind(bootmodule_kind kind,
-                                                             paddr_t start)
-{
-    struct bootmodules *mods = &bootinfo.modules;
-    struct bootmodule *mod;
-    unsigned int i;
-
-    for (i = 0 ; i < mods->nr_mods ; i++ )
-    {
-        mod = &mods->module[i];
-        if ( mod->kind == kind && mod->start == start )
-            return mod;
-    }
-    return NULL;
-}
-
 struct bootmodule kernel_bm = {
     .kind = BOOTMOD_KERNEL,
     .domU = false,
     .start = DOM0_KERNEL,
     .size = DOM0_KERNEL_SIZE,
 };
-
-/*
- * boot_module_find_by_kind can only be used to return Xen modules (e.g
- * XSM, DTB) or Dom0 modules. This is not suitable for looking up guest
- * modules.
- */
-struct bootmodule * __init boot_module_find_by_kind(bootmodule_kind kind)
-{
-    struct bootmodules *mods = &bootinfo.modules;
-    struct bootmodule *mod;
-    int i;
-
-    if (kind == BOOTMOD_KERNEL)
-        return &kernel_bm;
-
-    for (i = 0 ; i < mods->nr_mods ; i++ )
-    {
-        mod = &mods->module[i];
-        if ( mod->kind == kind && !mod->domU )
-            return mod;
-    }
-    return NULL;
-}
 
 void arch_get_xen_caps(xen_capabilities_info_t *info)
 {

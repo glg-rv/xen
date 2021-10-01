@@ -7,6 +7,7 @@
 #define __ARCH_RISCV_KERNEL_H__
 
 #include <xen/device_tree.h>
+#include <xen/bootfdt.h>
 #include <asm/setup.h>
 
 struct kernel_info {
