@@ -162,7 +162,7 @@ static void __init setup_mm(mfn_t dom0_kern_start, mfn_t dom0_kern_end)
  *
  * The real entry point is in head.S.
  */
-void __init start_xen(paddr_t fdt_start)
+void __init start_xen(paddr_t fdt_paddr, paddr_t boot_phys_offset)
 {
     struct ns16550_defaults ns16550 = {
         .data_bits = 8,

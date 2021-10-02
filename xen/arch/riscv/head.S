@@ -206,6 +206,8 @@ _cpu_init:
 	/* Jump to C code */
 	la	a6, _bootcpu_reg1
 	REG_L	a0, (a6)
+	la  a6, phys_offset
+	REG_L   a1, (a6)
 
 	call	start_xen
 
