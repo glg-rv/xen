@@ -214,73 +214,6 @@ static void __init processor_id(void)
     processor_setup();
 }
 
-static void __init dt_unreserved_regions(paddr_t s, paddr_t e,
-                                         void (*cb)(paddr_t, paddr_t),
-                                         unsigned int first)
-{
-    unsigned int i, nr;
-    int rc;
-
-    rc = fdt_num_mem_rsv(device_tree_flattened);
-    if ( rc < 0 )
-        panic("Unable to retrieve the number of reserved regions (rc=%d)\n",
-              rc);
-
-    nr = rc;
-
-    for ( i = first; i < nr ; i++ )
-    {
-        paddr_t r_s, r_e;
-
-        if ( fdt_get_mem_rsv(device_tree_flattened, i, &r_s, &r_e ) < 0 )
-            /* If we can't read it, pretend it doesn't exist... */
-            continue;
-
-        r_e += r_s; /* fdt_get_mem_rsv returns length */
-
-        if ( s < r_e && r_s < e )
-        {
-            dt_unreserved_regions(r_e, e, cb, i+1);
-            dt_unreserved_regions(s, r_s, cb, i+1);
-            return;
-        }
-    }
-
-    /*
-     * i is the current bootmodule we are evaluating across all possible
-     * kinds.
-     *
-     * When retrieving the corresponding reserved-memory addresses
-     * below, we need to index the bootinfo.reserved_mem bank starting
-     * from 0, and only counting the reserved-memory modules. Hence,
-     * we need to use i - nr.
-     */
-    for ( ; i - nr < bootinfo.reserved_mem.nr_banks; i++ )
-    {
-        paddr_t r_s = bootinfo.reserved_mem.bank[i - nr].start;
-        paddr_t r_e = r_s + bootinfo.reserved_mem.bank[i - nr].size;
-
-        if ( s < r_e && r_s < e )
-        {
-            dt_unreserved_regions(r_e, e, cb, i + 1);
-            dt_unreserved_regions(s, r_s, cb, i + 1);
-            return;
-        }
-    }
-
-    cb(s, e);
-}
-
-void __init fw_unreserved_regions(paddr_t s, paddr_t e,
-                                  void (*cb)(paddr_t, paddr_t),
-                                  unsigned int first)
-{
-    if ( acpi_disabled )
-        dt_unreserved_regions(s, e, cb, first);
-    else
-        cb(s, e);
-}
-
 void __init discard_initial_modules(void)
 {
     struct bootmodules *mi = &bootinfo.modules;
@@ -450,40 +383,6 @@ static paddr_t __init fit_xenheap_in_static_heap(uint32_t size, paddr_t align)
     return end;
 }
 #endif
-
-/*
- * Return the end of the non-module region starting at s. In other
- * words return s the start of the next modules after s.
- *
- * On input *end is the end of the region which should be considered
- * and it is updated to reflect the end of the module, clipped to the
- * end of the region if it would run over.
- */
-static paddr_t __init next_module(paddr_t s, paddr_t *end)
-{
-    struct bootmodules *mi = &bootinfo.modules;
-    paddr_t lowest = ~(paddr_t)0;
-    int i;
-
-    for ( i = 0; i < mi->nr_mods; i++ )
-    {
-        paddr_t mod_s = mi->module[i].start;
-        paddr_t mod_e = mod_s + mi->module[i].size;
-
-        if ( !mi->module[i].size )
-            continue;
-
-        if ( mod_s < s )
-            continue;
-        if ( mod_s > lowest )
-            continue;
-        if ( mod_s > *end )
-            continue;
-        lowest = mod_s;
-        *end = min(*end, mod_e);
-    }
-    return lowest;
-}
 
 static void __init init_pdx(void)
 {
