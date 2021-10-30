@@ -4,6 +4,7 @@ obj-y   += domctl.o
 obj-y   += domain.o
 obj-y   += domain_build.o
 obj-y   += delay.o
+obj-y   += early_printk.o
 obj-y   += entry.o
 obj-y   += guestcopy.o
 obj-y   += irq.o
