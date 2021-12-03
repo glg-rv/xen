@@ -97,6 +97,8 @@ domid_t max_init_domid = 0;
 
 struct domain *xen_dom;
 
+bool acpi_disabled = true;
+
 /* The lucky hart to first increment this variable will boot the other cores */
 atomic_t hart_lottery;
 unsigned long boot_cpu_hartid;
