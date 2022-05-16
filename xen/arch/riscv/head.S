@@ -21,16 +21,16 @@ _start:
 	csrc CSR_SSTATUS, t0
 
 	/* Save HART ID and DTB base */
-	la	a6, _bootcpu_reg0
+	lla	a6, _bootcpu_reg0
 	REG_S	a0, (a6)
-	la	a6, _bootcpu_reg1
+	lla	a6, _bootcpu_reg1
 	REG_S	a1, (a6)
 
 	/*
 	 * Select CPU 0, hang the rest.
 	 * TODO: support SMP
 	 */
-	la a3, hart_lottery
+	lla a3, hart_lottery
 	li a2, 1
 	amoadd.w a3, a2, (a3)
 	bnez a3, _start_hang
@@ -42,27 +42,27 @@ _save_load_addresses:
 	 * a4 -> execution start
 	 * a5 -> execution end
 	 */
-	la	a2, _start
-	la	a6, __exec_start
+	lla	a2, _start
+	lla	a6, __exec_start
 	REG_L	a4, (a6)
-	la	a6, __exec_end
+	lla	a6, __exec_end
 	REG_L	a5, (a6)
 	sub	a6, a5, a4
 	add	a3, a2, a6
-	la	a6, _load_start
+	lla	a6, _load_start
 	REG_S	a2, (a6)
-	la	a6, _load_end
+	lla	a6, _load_end
 	REG_S	a3, (a6)
-	la	a6, _end
+	lla	a6, _end
 	REG_S	a3, (a6)
 
 _bss_zero_start:
 	/* Zero-out bss section */
-	la	a6, __bss_start
+	lla	a6, __bss_start
 	REG_L	a0, (a6)
 	sub	a0, a0, a4
 	add	a0, a0, a2
-	la	a6, __bss_end
+	lla	a6, __bss_end
 	REG_L	a1, (a6)
 	sub	a1, a1, a4
 	add	a1, a1, a2
@@ -72,37 +72,37 @@ _bss_zero_loop:
 	blt	a0, a1, _bss_zero_loop
 
 	/* Setup temporary stack */
-	la	a6, __hvc_stack_end
+	lla	a6, __hvc_stack_end
 	REG_L	a0, (a6)
 	sub	a0, a0, a4
 	add	sp, a0, a2
 
         /* Setup hang for IRQ vector w/ virtual address */
-	la	a6, __debug_irq_vector
+	lla	a6, __debug_irq_vector
         REG_L   a4, (a6)
 	csrw	CSR_STVEC, a4
 
 	/* Setup initial page table */
-	la	a6, _load_start
+	lla	a6, _load_start
 	REG_L	a0, (a6)
-	la	a6, _load_end
+	lla	a6, _load_end
 	REG_L	a1, (a6)
-	la	a6, __exec_start
+	lla	a6, __exec_start
 	REG_L	a2, (a6)
-	la	a6, __exec_end
+	lla	a6, __exec_end
 	REG_L	a3, (a6)
 	call	_setup_initial_pagetables
 
-    la      a0, _bootcpu_reg0
+    lla      a0, _bootcpu_reg0
     REG_L   a0, (a0)
 
 /* a0 must equal the hartid */
 _set_xen_tp:
     /* Load pcpu_info[NR_CPUS] address */
-    la  a6, pcpu_info
+    lla  a6, pcpu_info
 
     /* Adjust by phys_offset so it doesn't require the identity map */
-    la  a7, phys_offset
+    lla  a7, phys_offset
     REG_L   a7, (a7)
     sub a6, a6, a7
 
@@ -116,6 +116,12 @@ _set_xen_tp:
 
     /* set processor id of pcpu_info[hartid].processor_id */
     REG_S a0, RISCV_PCPUINFO_OFFSET(processor_id)(tp)
+
+    /* Move stack pointer */
+    lla  t0, phys_offset
+    REG_L   t0, (t0)
+    sub sp, sp, t0
+    
 
 	j	_start_secondary_nopen
 
@@ -131,11 +137,11 @@ __start_secondary_pen_release:
 	 */
 _start_secondary_nopen:
 	/* Set trap vector to spin forever to help debug */
-	//la	a6, _start_hang
+	//lla	a6, _start_hang
 	//csrw	CSR_STVEC, a6
 
 	/* Jump to final execution address */
-	la	a6, __cpu_init
+	lla	a6, __cpu_init
 	REG_L	a0, (a6)
 	jalr	a0
 
@@ -204,9 +210,9 @@ __hvc_stack_end:
 	.globl _cpu_init
 _cpu_init:
 	/* Jump to C code */
-	la	a6, _bootcpu_reg1
+	lla	a6, _bootcpu_reg1
 	REG_L	a0, (a6)
-	la  a6, phys_offset
+	lla  a6, phys_offset
 	REG_L   a1, (a6)
 
 	call	start_xen

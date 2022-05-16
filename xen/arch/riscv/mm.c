@@ -812,9 +812,7 @@ _setup_initial_pagetables(unsigned long load_addr_start,
     csr_write(CSR_SATP,
               (load_addr(xen_second_pagetable) >> PAGE_SHIFT) | SATP_MODE);
 
-    phys_offset = load_addr_start > linker_addr_start ?
-                      load_addr_start - linker_addr_start :
-                      linker_addr_start - load_addr_start;
+    phys_offset = load_addr_start - linker_addr_start;
 }
 
 /* Map a frame table to cover physical addresses ps through pe */
