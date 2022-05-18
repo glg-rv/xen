@@ -41,6 +41,7 @@ SECTIONS
 {
   . = XEN_VIRT_START;
   . = ALIGN(PAGE_SIZE); /* Need this to create proper sections */
+  _start = .;
   PROVIDE(_code_start = .);
 
   /* Beginning of the code section */
@@ -261,4 +262,5 @@ SECTIONS
   . = ALIGN(PAGE_SIZE); /* Need this to create proper pages */
 
   PROVIDE(_code_end = .);
+  _end = .;
 }

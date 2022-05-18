@@ -43,6 +43,7 @@
 #include <xen/virtual_region.h>
 #include <xen/vmap.h>
 #include <xen/trace.h>
+#include <xen/sort.h>
 #include <asm/page.h>
 #include <asm/current.h>
 #include <asm/setup.h>
@@ -123,41 +124,143 @@ void arch_get_xen_caps(xen_capabilities_info_t *info)
     safe_strcat(*info, s);
 }
 
-/*
- * TODO: Do not hardcode this.  There has been discussion on how OpenSBI will
- * communicate it's protected space to its payload.  Xen will need to conform
- * to that approach.
- *
- * 0x80000000 - 0x80200000 is PMP protected by OpenSBI so exclude it from the
- * ram range (any attempt at using it will trigger a PMP fault).
- */
-#define OPENSBI_OFFSET 0x0200000
-#define XEN_OFFSET (2 << 20)
+
+/* This function assumes that memory regions are not overlapped */
+static int __init cmp_memory_node(const void *key, const void *elem)
+{
+    const struct membank *handler0 = key;
+    const struct membank *handler1 = elem;
+
+    if ( handler0->start < handler1->start )
+        return -1;
+
+    if ( handler0->start >= (handler1->start + handler1->size) )
+        return 1;
+
+    return 0;
+}
+
+
+static void __init init_pdx(void)
+{
+    paddr_t bank_start, bank_size, bank_end;
+
+    /*
+     * Arm does not have any restrictions on the bits to compress. Pass 0 to
+     * let the common code further restrict the mask.
+     *
+     * If the logic changes in pfn_pdx_hole_setup we might have to
+     * update this function too.
+     */
+    uint64_t mask = pdx_init_mask(0x0);
+    int bank;
+
+    for ( bank = 0 ; bank < bootinfo.mem.nr_banks; bank++ )
+    {
+        bank_start = bootinfo.mem.bank[bank].start;
+        bank_size = bootinfo.mem.bank[bank].size;
+
+        mask |= bank_start | pdx_region_mask(bank_start, bank_size);
+    }
+
+    for ( bank = 0 ; bank < bootinfo.mem.nr_banks; bank++ )
+    {
+        bank_start = bootinfo.mem.bank[bank].start;
+        bank_size = bootinfo.mem.bank[bank].size;
+
+        if (~mask & pdx_region_mask(bank_start, bank_size))
+            mask = 0;
+    }
+
+    pfn_pdx_hole_setup(mask >> PAGE_SHIFT);
+
+    for ( bank = 0 ; bank < bootinfo.mem.nr_banks; bank++ )
+    {
+        bank_start = bootinfo.mem.bank[bank].start;
+        bank_size = bootinfo.mem.bank[bank].size;
+        bank_end = bank_start + bank_size;
+
+        set_pdx_range(paddr_to_pfn(bank_start),
+                      paddr_to_pfn(bank_end));
+    }
+}
 
 static void __init setup_mm(mfn_t dom0_kern_start, mfn_t dom0_kern_end)
 {
-    paddr_t ram_start, ram_end, ram_size;
+    paddr_t ram_start = ~0;
+    paddr_t ram_end = 0;
+    paddr_t ram_size = 0;
+    int bank;
 
-    /* TODO: Use FDT instead of hardcoding these values */
+    /* common/bootfdt.c */
+    paddr_t __init next_module(paddr_t s, paddr_t *end);
+    void __init fw_unreserved_regions(paddr_t s, paddr_t e,
+                                      void (*cb)(paddr_t, paddr_t), int first);
+
+    /* Register reserved memory as boot modules. */
+    for ( bank = 0; bank < bootinfo.reserved_mem.nr_banks; bank++ )
+    {
+        struct bootmodule *reserved_bootmodule;
+        paddr_t bank_start = bootinfo.reserved_mem.bank[bank].start;
+        paddr_t bank_size = bootinfo.reserved_mem.bank[bank].size;
+
+        reserved_bootmodule = add_boot_module(BOOTMOD_XEN, bank_start,
+                                              bank_size, false);
+        BUG_ON(!reserved_bootmodule);
+    }
 
     /*
-     * For now, just skip over the boot modules (DTB is the last one.
-     * see DOM0_KERNEL/DTB declarations for layout of boot omdules)
+     * On RISC-V setup_xenheap_mappings() expects to be called with the lowest
+     * bank in memory first. There is no requirement that the DT will provide
+     * the banks sorted in ascending order. So sort them through.
      */
-    ram_start = PAGE_ALIGN(DTB + DTB_SIZE);
-    ram_end   = 0xc0000000;
-    ram_size = ram_end - ram_start;
+    sort(bootinfo.mem.bank, bootinfo.mem.nr_banks, sizeof(struct membank),
+         cmp_memory_node, NULL);
 
-    total_pages = ram_size >> PAGE_SHIFT;
-    pfn_pdx_hole_setup(0);
-    setup_xenheap_mappings(ram_start>>PAGE_SHIFT, total_pages);
-    xenheap_virt_end = XENHEAP_VIRT_START + ram_size;
+    init_pdx();
+
+    total_pages = 0;
+    for ( bank = 0 ; bank < bootinfo.mem.nr_banks; bank++ )
+    {
+        paddr_t bank_start = bootinfo.mem.bank[bank].start;
+        paddr_t bank_size = bootinfo.mem.bank[bank].size;
+        paddr_t bank_end = bank_start + bank_size;
+        paddr_t s, e;
+
+        ram_size = ram_size + bank_size;
+        ram_start = min(ram_start,bank_start);
+        ram_end = max(ram_end,bank_end);
+
+        setup_xenheap_mappings(bank_start>>PAGE_SHIFT, bank_size>>PAGE_SHIFT);
+
+        s = bank_start;
+        while ( s < bank_end )
+        {
+            paddr_t n = bank_end;
+
+            e = next_module(s, &n);
+
+            if ( e == ~(paddr_t)0 )
+            {
+                e = n = bank_end;
+            }
+
+            if ( e > bank_end )
+                e = bank_end;
+
+            fw_unreserved_regions(s, e, init_boot_pages, 0);
+            s = n;
+        }
+    }
+
+    total_pages += ram_size >> PAGE_SHIFT;
+
+    xenheap_virt_end = XENHEAP_VIRT_START + ram_end - ram_start;
+    xenheap_mfn_start = maddr_to_mfn(ram_start);
     xenheap_mfn_end = maddr_to_mfn(ram_end);
-    init_boot_pages(mfn_to_maddr(xenheap_mfn_start),
-                    mfn_to_maddr(xenheap_mfn_end));
+
+    setup_frametable_mappings(ram_start, ram_end);
     max_page = PFN_DOWN(ram_end);
-    setup_frametable_mappings(0, ram_end);
-    setup_fixmap_mappings();
 }
 
 /** start_xen - The C entry point
@@ -178,12 +281,39 @@ void __init start_xen(paddr_t fdt_paddr, paddr_t boot_phys_offset)
         .max_grant_frames = gnttab_dom0_frames(),
         .max_maptrack_frames = -1,
     };
+    
+    size_t fdt_size;
+    const char *cmdline;
     unsigned int i;
+    struct bootmodule *xen_bootmodule, *fdt_bootmodule;
 
     nr_cpu_ids = NR_CPUS;
 
     setup_virtual_regions(NULL, NULL);
     smp_clear_cpu_maps();
+    
+    device_tree_flattened = early_fdt_map(fdt_paddr);
+    if ( !device_tree_flattened )
+        panic("Invalid device tree blob at physical address %#lx.\n"
+              "The DTB must be 8-byte aligned and must not exceed 2 MB in size.\n\n"
+              "Please check your bootloader.\n",
+              fdt_paddr);
+
+    fdt_size = boot_fdt_info(device_tree_flattened, fdt_paddr);
+
+    /* Register Xen's load address as a boot module. */
+    xen_bootmodule = add_boot_module(BOOTMOD_XEN,
+                             (paddr_t)(uintptr_t)(_start + boot_phys_offset),
+                             (paddr_t)(uintptr_t)(_end - _start), false);
+    /* FDT */
+    fdt_bootmodule = add_boot_module(BOOTMOD_FDT,
+                                     (paddr_t)(uintptr_t)(fdt_paddr),
+                                     (paddr_t)(uintptr_t)(fdt_size), false);
+    BUG_ON(!xen_bootmodule || !fdt_bootmodule);
+    
+    cmdline = boot_fdt_cmdline(device_tree_flattened);
+    printk("Command line: %s\n", cmdline);
+    cmdline_parse(cmdline);
 
     init_xen_time();
 

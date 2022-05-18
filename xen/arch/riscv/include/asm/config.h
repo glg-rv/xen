@@ -103,6 +103,11 @@
 #define XEN_VIRT_END           _AT(vaddr_t,0x40000000)
 #define FIXMAP_ADDR(n)        (_AT(vaddr_t,0x00400000) + (n) * PAGE_SIZE)
 
+#define BOOT_FDT_VIRT_START    _AT(vaddr_t,0x00600000)
+#define BOOT_FDT_SLOT_SIZE     MB(4)
+#define BOOT_FDT_VIRT_END      (BOOT_FDT_VIRT_START + BOOT_FDT_SLOT_SIZE)
+
+
 #define HYPERVISOR_VIRT_START  XEN_VIRT_START
 
 #define INVALID_VCPU_ID MAX_VIRT_CPUS

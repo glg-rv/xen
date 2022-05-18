@@ -154,11 +154,10 @@ extern vaddr_t xenheap_virt_start;
 })
 
 /* Convert between machine frame numbers and page-info structures. */
-/* NOTE: mfn_to_page(x) -> FRAMETABLE_VIRT_START + (sizeof(struct page_info *) * mfn) */
 #define mfn_to_page(mfn)                                            \
-    (frame_table + (mfn_to_pdx(mfn)))
+    (frame_table + (mfn_to_pdx(mfn) - frametable_base_pdx))
 #define page_to_mfn(pg)                                             \
-    pdx_to_mfn((unsigned long)((pg) - frame_table))
+    pdx_to_mfn((unsigned long)((pg) - frame_table) + frametable_base_pdx)
 
 /* Convert between machine addresses and page-info structures. */
 #define maddr_to_page(ma) mfn_to_page(maddr_to_mfn(ma))
@@ -226,7 +225,7 @@ static inline struct page_info *virt_to_page(const void *v)
 
     pdx = (va - XENHEAP_VIRT_START) >> PAGE_SHIFT;
     pdx += pfn_to_pdx(mfn_x(xenheap_mfn_start));
-    return frame_table + pdx;
+    return frame_table + pdx - frametable_base_pdx;
 }
 
 static inline void *page_to_virt(const struct page_info *pg)
@@ -307,6 +306,9 @@ int pt_update(vaddr_t root, vaddr_t va, paddr_t pa,
               bool use_xenheap, struct domain *d, unsigned long flags);
 
 paddr_t pt_walk(unsigned long root, vaddr_t va, bool is_xen);
+
+/* Map FDT in boot pagetable */
+extern void *early_fdt_map(paddr_t fdt_paddr);
 
 #endif /*  __ARCH_RISCV_MM__ */
 /*

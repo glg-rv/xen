@@ -50,6 +50,8 @@
 #include <xen/pfn.h>
 #include <xen/sizes.h>
 #include <asm/setup.h>
+#include <xen/libfdt/libfdt.h>
+#include <xen/bootfdt.h>
 
 #define XEN_TABLE_MAP_FAILED 0
 #define XEN_TABLE_SUPER_PAGE 1
@@ -461,24 +463,7 @@ unsigned long get_upper_mfn_bound(void)
     return max_page - 1;
 }
 
-static void setup_second_level_mappings(pte_t *first_pagetable,
-                                        unsigned long vaddr)
-{
-    unsigned long paddr;
-    unsigned long index;
-    pte_t *p;
-
-    index = pagetable_second_index(vaddr);
-    p = &xen_second_pagetable[index];
-
-    if ( !pte_is_valid(p) )
-    {
-        paddr = phys_offset + ((unsigned long)first_pagetable);
-        p->pte = addr_to_ppn(paddr);
-        p->pte |= PTE_TABLE;
-    }
-}
-
+/* Set up leaf pages in a first-level page table. */
 void setup_megapages(pte_t *first_pagetable, unsigned long virtual_start,
                      unsigned long physical_start, unsigned long page_cnt)
 {
@@ -492,8 +477,6 @@ void setup_megapages(pte_t *first_pagetable, unsigned long virtual_start,
 
     while ( frame_addr < end )
     {
-        setup_second_level_mappings(first_pagetable, vaddr);
-
         index = pagetable_first_index(vaddr);
         p = &first_pagetable[index];
         p->pte = paddr_to_megapage_ppn(frame_addr);
@@ -502,8 +485,6 @@ void setup_megapages(pte_t *first_pagetable, unsigned long virtual_start,
         frame_addr += FIRST_SIZE;
         vaddr += FIRST_SIZE;
     }
-
-    asm volatile("sfence.vma");
 }
 
 void setup_fixmap_mappings(void)
@@ -635,6 +616,52 @@ void __init setup_xenheap_mappings(unsigned long base_mfn,
             __##x = (unsigned long *)(x + load_addr_start - linker_addr_start); \
         __##x;                                                                  \
      })
+
+void * __init early_fdt_map(paddr_t fdt_paddr)
+{
+    /* We are using 2MB superpage for mapping the FDT */
+    paddr_t base_paddr = fdt_paddr & (SECOND_MASK | FIRST_MASK);
+    paddr_t offset;
+    void *fdt_virt;
+    uint32_t size;
+
+    /*
+     * Check whether the physical FDT address is set and meets the minimum
+     * alignment requirement. Since we are relying on MIN_FDT_ALIGN to be at
+     * least 8 bytes so that we always access the magic and size fields
+     * of the FDT header after mapping the first chunk, double check if
+     * that is indeed the case.
+     */
+    BUILD_BUG_ON(MIN_FDT_ALIGN < 8);
+    if ( !fdt_paddr || fdt_paddr % MIN_FDT_ALIGN )
+        return NULL;
+
+    /* The FDT is mapped using 2MB superpage */
+    BUILD_BUG_ON(BOOT_FDT_VIRT_START % SZ_2M);
+
+    setup_megapages(xen_first_pagetable, BOOT_FDT_VIRT_START, base_paddr,
+                    SZ_2M >> PAGE_SHIFT);
+
+    offset = fdt_paddr % FIRST_SIZE;
+    fdt_virt = (void *)BOOT_FDT_VIRT_START + offset;
+
+    if ( fdt_magic(fdt_virt) != FDT_MAGIC )
+        return NULL;
+
+    size = fdt_totalsize(fdt_virt);
+    if ( size > MAX_FDT_SIZE )
+        return NULL;
+
+    if ( (offset + size) > SZ_2M )
+    {
+        setup_megapages(xen_first_pagetable, BOOT_FDT_VIRT_START + SZ_2M,
+                        base_paddr + SZ_2M, SZ_2M >> PAGE_SHIFT);
+    }
+
+    asm volatile("sfence.vma");
+
+    return fdt_virt;
+}
 
 void __init clear_pagetables(unsigned long load_addr_start,
                              unsigned long load_addr_end,
@@ -821,58 +848,43 @@ void __init setup_frametable_mappings(paddr_t ps, paddr_t pe)
     unsigned long nr_pdxs = mfn_to_pdx(mfn_add(maddr_to_mfn(pe), -1)) -
                             mfn_to_pdx(maddr_to_mfn(ps)) + 1;
     unsigned long frametable_size = nr_pdxs * sizeof(struct page_info);
-    unsigned long virt_end;
-    pte_t *first_table;
-    mfn_t mfn, base, first;
-    pte_t pte;
-    unsigned long i, first_entries_remaining;
+    unsigned long virt_base, virt_end;
+    unsigned long second_base, second_end, second_index;
+    mfn_t base;
+
+    /* Frame table should be 2M aligned. */
+    BUILD_BUG_ON(!IS_ALIGNED(FRAMETABLE_VIRT_START, FIRST_SIZE));
 
     frametable_base_pdx = mfn_to_pdx(maddr_to_mfn(ps));
+    frametable_size = ROUNDUP(frametable_size, FIRST_SIZE);
+    virt_base = FRAMETABLE_VIRT_START;
+    virt_end = FRAMETABLE_VIRT_START + frametable_size;
+    second_base = virt_base >> SECOND_SHIFT;
+    second_end = ROUNDUP(virt_end, SECOND_SIZE) >> SECOND_SHIFT;
+    
 
     /* Allocate enough pages to hold the whole address space */
-    base = alloc_boot_pages(frametable_size >> PAGE_SHIFT, MB(2) >> PAGE_SHIFT);
-    virt_end = FRAMETABLE_VIRT_START + frametable_size;
+    base = alloc_boot_pages(frametable_size >> PAGE_SHIFT, FIRST_SIZE >> PAGE_SHIFT);
 
-    first_entries_remaining = 0;
-    mfn = base;
-
-    /* Map the frametable virtual address speace to thse pages */
-    for ( i = ROUNDUP(FRAMETABLE_VIRT_START, MB(2)); i < virt_end; i += MB(2) )
+    /* Map the frametable virtual address space to these pages */
+    for ( second_index = second_base; second_index < second_end; second_index++ )
     {
-        /* If this frame has filled up all entries, then allocate a new table */
-        if ( first_entries_remaining <= 0 )
-        {
-            /* Allocate page for a first-level table */
-            first = alloc_boot_pages(1, 1);
+        mfn_t first = alloc_boot_pages(1, 1);
+        pte_t *first_table = (pte_t *)mfn_to_virt(first);
+        unsigned long vs, ve, ps;
+        pte_t *second_pte = &xen_second_pagetable[second_index];
 
-            /* TODO: add clear_page(mfn_to_virt(first)); */
+        vs = max(second_index << SECOND_SHIFT, virt_base);
+        ve = min((second_index + 1) << SECOND_SHIFT, virt_end);
+        ps = vs - virt_base + mfn_to_maddr(base);
 
-            /* Reset counter */
-            first_entries_remaining = 512;
-        }
-
-        /* Convert the first-level table from it's machine frame number to a virtual_address */
-        first_table = (pte_t *)mfn_to_virt(first);
-
-        pte = mfn_to_xen_entry(mfn);
-        pte.pte |= PTE_LEAF_DEFAULT;
-
-        /* Point the first-level table to the machine frame */
-        write_pte(&first_table[pagetable_first_index(i)], pte);
-
-        /* Convert the first-level table address into a PTE */
-        pte = mfn_to_xen_entry(maddr_to_mfn(virt_to_maddr(&first_table[0])));
-        pte.pte |= PTE_TABLE;
-
-        /* Point the second-level table to the first-level table */
-        write_pte(&xen_second_pagetable[pagetable_second_index(i)], pte);
-
-        /* First-level tables are at a 2MB granularity so go to the next 2MB page */
-        mfn = mfn_add(mfn, MB(2) >> PAGE_SHIFT);
-
-        /* We've used an entry, so decrement the counter */
-        first_entries_remaining--;
+        clear_page(mfn_to_virt(first));
+        setup_megapages(first_table, vs, ps, (ve - vs) >> PAGE_SHIFT);
+        *second_pte = paddr_to_pte(mfn_to_maddr(first));
+        second_pte->pte |= PTE_TABLE;
     }
+    
+    asm volatile("sfence.vma");
 
     memset(&frame_table[0], 0, nr_pdxs * sizeof(struct page_info));
     memset(&frame_table[nr_pdxs], -1,
