@@ -185,17 +185,44 @@ static void __init init_pdx(void)
     }
 }
 
+static void __init setup_memory_region(paddr_t bank_start, paddr_t bank_end)
+{
+    paddr_t bank_size = bank_end - bank_start;
+    paddr_t s, e;
+
+    /* common/bootfdt.c */
+    paddr_t __init next_module(paddr_t s, paddr_t *end);
+    void __init fw_unreserved_regions(paddr_t s, paddr_t e,
+                                      void (*cb)(paddr_t, paddr_t), int first);
+
+    setup_xenheap_mappings(bank_start>>PAGE_SHIFT, bank_size>>PAGE_SHIFT);
+
+    s = bank_start;
+    while ( s < bank_end )
+    {
+        paddr_t n = bank_end;
+
+        e = next_module(s, &n);
+
+        if ( e == ~(paddr_t)0 )
+        {
+            e = n = bank_end;
+        }
+
+        if ( e > bank_end )
+            e = bank_end;
+
+        fw_unreserved_regions(s, e, init_boot_pages, 0);
+        s = n;
+    }
+}
+
 static void __init setup_mm(mfn_t dom0_kern_start, mfn_t dom0_kern_end)
 {
     paddr_t ram_start = ~0;
     paddr_t ram_end = 0;
     paddr_t ram_size = 0;
     int bank;
-
-    /* common/bootfdt.c */
-    paddr_t __init next_module(paddr_t s, paddr_t *end);
-    void __init fw_unreserved_regions(paddr_t s, paddr_t e,
-                                      void (*cb)(paddr_t, paddr_t), int first);
 
     /* Register reserved memory as boot modules. */
     for ( bank = 0; bank < bootinfo.reserved_mem.nr_banks; bank++ )
@@ -225,32 +252,26 @@ static void __init setup_mm(mfn_t dom0_kern_start, mfn_t dom0_kern_end)
         paddr_t bank_start = bootinfo.mem.bank[bank].start;
         paddr_t bank_size = bootinfo.mem.bank[bank].size;
         paddr_t bank_end = bank_start + bank_size;
-        paddr_t s, e;
+        paddr_t bank_split;
 
         ram_size = ram_size + bank_size;
         ram_start = min(ram_start,bank_start);
         ram_end = max(ram_end,bank_end);
 
-        setup_xenheap_mappings(bank_start>>PAGE_SHIFT, bank_size>>PAGE_SHIFT);
-
-        s = bank_start;
-        while ( s < bank_end )
+        /*
+         * At most SECOND_SIZE of memory can be mapped before alloc_boot_pages
+         * is available. Map an area within a single second level leaf pte and
+         * enable the boot allocator, and then map the remaining memory.
+         */
+        bank_split = min(bank_end, ROUNDUP(bank_start + 1, SECOND_SIZE));
+        /* It is the first bank and the size of it exceeds one second level megapage */
+        if ( bank == 0 && bank_split < bank_end)
         {
-            paddr_t n = bank_end;
-
-            e = next_module(s, &n);
-
-            if ( e == ~(paddr_t)0 )
-            {
-                e = n = bank_end;
-            }
-
-            if ( e > bank_end )
-                e = bank_end;
-
-            fw_unreserved_regions(s, e, init_boot_pages, 0);
-            s = n;
+            setup_memory_region(bank_start, bank_split);
+            setup_memory_region(bank_split, bank_end);
         }
+        else
+            setup_memory_region(bank_start, bank_end);
     }
 
     total_pages += ram_size >> PAGE_SHIFT;

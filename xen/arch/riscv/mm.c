@@ -533,8 +533,10 @@ void __init setup_xenheap_mappings(unsigned long base_mfn,
     vaddr_t vaddr;
     pte_t *first, pte;
 
-    /* The most that this can possibly map is 1GB */
-    BUG_ON(nr_mfns > (GB(1) >> PAGE_SHIFT));
+    /* Only use one second level page table before boot allocator available. */
+    BUG_ON(xen_second_heap_slot == -1
+           && (base_mfn >> (SECOND_SHIFT - PAGE_SHIFT))
+              < ((base_mfn + nr_mfns - 1) >> (SECOND_SHIFT - PAGE_SHIFT)));
 
     /* Align to previous 2MB boundary */
     mfn = base_mfn & ~((FIRST_SIZE >> PAGE_SHIFT) - 1);
