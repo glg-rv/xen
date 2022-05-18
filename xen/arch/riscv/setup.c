@@ -105,13 +105,6 @@ atomic_t hart_lottery;
 unsigned long boot_cpu_hartid;
 unsigned long total_pages;
 
-struct bootmodule kernel_bm = {
-    .kind = BOOTMOD_KERNEL,
-    .domU = false,
-    .start = DOM0_KERNEL,
-    .size = DOM0_KERNEL_SIZE,
-};
-
 void arch_get_xen_caps(xen_capabilities_info_t *info)
 {
     /* Interface name is always xen-3.0-* for Xen-3.x. */
@@ -217,7 +210,7 @@ static void __init setup_memory_region(paddr_t bank_start, paddr_t bank_end)
     }
 }
 
-static void __init setup_mm(mfn_t dom0_kern_start, mfn_t dom0_kern_end)
+static void __init setup_mm(void)
 {
     paddr_t ram_start = ~0;
     paddr_t ram_end = 0;
@@ -338,7 +331,7 @@ void __init start_xen(paddr_t fdt_paddr, paddr_t boot_phys_offset)
 
     init_xen_time();
 
-    setup_mm(_mfn(DOM0_KERNEL), _mfn(DOM0_KERNEL + DOM0_KERNEL_SIZE));
+    setup_mm();
     end_boot_allocator();
 
     /*

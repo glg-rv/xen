@@ -6,10 +6,6 @@
 extern domid_t max_init_domid;
 
 #define NR_VCPUS 2
-#define DOM0_KERNEL 0x80400000
-#define DOM0_KERNEL_SIZE 5704861
-#define DOM0_INITRD 0x0
-#define DOM0_INITRD_SIZE 0x0
 #define DTB 0x80972000
 #define DTB_SIZE 3686
 
