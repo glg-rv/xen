@@ -57,11 +57,11 @@ static paddr_t __init kernel_zimage_place(struct kernel_info *info)
 static void __init place_modules(struct kernel_info *info,
                                  paddr_t kernbase, paddr_t kernend)
 {
-    const paddr_t modsize = DTB_SIZE;
+    const paddr_t modsize = fdt_totalsize(info->fdt);
     const paddr_t rambase = info->mem.bank[0].start;
     const paddr_t ramsize = info->mem.bank[0].size;
     const paddr_t ramend = rambase + ramsize;
-    const paddr_t dtb_len = DTB_SIZE;
+    const paddr_t dtb_len = fdt_totalsize(info->fdt);
     const paddr_t kernsize = ROUNDUP(kernend, MB(2)) - kernbase;
     const paddr_t ram128mb = rambase + MB(128);
 

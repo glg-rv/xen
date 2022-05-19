@@ -2,8 +2,24 @@
 #include <asm/guest_access.h>
 #include <xen/domain.h>
 #include <xen/vmap.h>
+#include <xen/param.h>
+#include <xen/warning.h>
+#include <xen/libfdt/libfdt.h>
+#include <asm-riscv/acpi.h>
 
 static u64 __initdata dom0_mem;
+static bool __initdata dom0_mem_set;
+
+static int __init parse_dom0_mem(const char *s)
+{
+    dom0_mem_set = true;
+
+    dom0_mem = parse_size_and_unit(s, &s);
+
+    return *s ? -EINVAL : 0;
+}
+custom_param("dom0_mem", parse_dom0_mem);
+
 
 static unsigned int __init get_allocation_size(paddr_t size)
 {
@@ -112,29 +128,78 @@ fail:
           (unsigned long)kinfo->unassigned_mem >> 10);
 }
 
+/*
+ * Amount of extra space required to dom0's device tree.  No new nodes
+ * are added (yet) but one terminating reserve map entry (16 bytes) is
+ * added.
+ */
+#define DOM0_FDT_EXTRA_SIZE (128 + sizeof(struct fdt_reserve_entry))
+
 static void __init dtb_load(struct kernel_info *kinfo)
 {
     unsigned long left;
-    void *dtb;
 
     printk("Loading %pd DTB to 0x%"PRIpaddr"-0x%"PRIpaddr"\n",
            kinfo->d, kinfo->dtb_paddr,
-           kinfo->dtb_paddr + DTB_SIZE);
+           kinfo->dtb_paddr + fdt_totalsize(kinfo->fdt));
 
-    dtb = ioremap_wc(DTB, DTB_SIZE);
     left = copy_to_guest_phys(kinfo->d, kinfo->dtb_paddr,
-                              dtb, DTB_SIZE);
+                              kinfo->fdt,
+                              fdt_totalsize(kinfo->fdt));
 
     if ( left != 0 )
         panic("Unable to copy the DTB to %pd memory (left = %lu bytes)\n",
               kinfo->d, left);
 
-    iounmap(dtb);
+    xfree(kinfo->fdt);
 }
 
 static void __init initrd_load(struct kernel_info *kinfo)
 {
-    printk("%s: unimplemented!\n", __func__);
+    const struct bootmodule *mod = kinfo->initrd_bootmodule;
+    paddr_t load_addr = kinfo->initrd_paddr;
+    paddr_t paddr, len;
+    int node;
+    int res;
+    __be32 val[2];
+    __be32 *cellp;
+    void __iomem *initrd;
+
+    if ( !mod || !mod->size )
+        return;
+
+    paddr = mod->start;
+    len = mod->size;
+
+    printk("Loading %pd initrd from %"PRIpaddr" to 0x%"PRIpaddr"-0x%"PRIpaddr"\n",
+           kinfo->d, paddr, load_addr, load_addr + len);
+
+    /* Fix up linux,initrd-start and linux,initrd-end in /chosen */
+    node = fdt_path_offset(kinfo->fdt, "/chosen");
+    if ( node < 0 )
+        panic("Cannot find the /chosen node\n");
+
+    cellp = (__be32 *)val;
+    dt_set_cell(&cellp, ARRAY_SIZE(val), load_addr);
+    res = fdt_setprop_inplace(kinfo->fdt, node, "linux,initrd-start",
+                              val, sizeof(val));
+    if ( res )
+        panic("Cannot fix up \"linux,initrd-start\" property\n");
+
+    cellp = (__be32 *)val;
+    dt_set_cell(&cellp, ARRAY_SIZE(val), load_addr + len);
+    res = fdt_setprop_inplace(kinfo->fdt, node, "linux,initrd-end",
+                              val, sizeof(val));
+    if ( res )
+        panic("Cannot fix up \"linux,initrd-end\" property\n");
+
+    initrd = ioremap_wc(paddr, len);
+    if ( !initrd )
+        panic("Unable to map the hwdom initrd\n");
+
+    res = copy_to_guest_phys(kinfo->d, load_addr, initrd, len);
+    if ( res != 0 )
+        panic("Unable to copy the initrd in the hwdom memory\n");
 }
 
 static int __init construct_domain(struct domain *d, struct kernel_info *kinfo)
@@ -176,6 +241,52 @@ static int __init construct_domain(struct domain *d, struct kernel_info *kinfo)
     return 0;
 }
 
+static int __init handle_node(struct domain *d, struct kernel_info *kinfo,
+                              struct dt_device_node *node,
+                              p2m_type_t p2mt)
+{
+    /* TODO */
+    return 0;
+}
+
+static int __init prepare_dtb_hwdom(struct domain *d, struct kernel_info *kinfo)
+{
+    const p2m_type_t default_p2mt = p2m_mmio_direct_c;
+    const void *fdt;
+    int new_size;
+    int ret;
+
+    ASSERT(dt_host && (dt_host->sibling == NULL));
+
+    fdt = device_tree_flattened;
+
+    new_size = fdt_totalsize(fdt) + DOM0_FDT_EXTRA_SIZE;
+    kinfo->fdt = xmalloc_bytes(new_size);
+    if ( kinfo->fdt == NULL )
+        return -ENOMEM;
+
+    ret = fdt_create(kinfo->fdt, new_size);
+    if ( ret < 0 )
+        goto err;
+
+    fdt_finish_reservemap(kinfo->fdt);
+
+    ret = handle_node(d, kinfo, dt_host, default_p2mt);
+    if ( ret )
+        goto err;
+
+    ret = fdt_finish(kinfo->fdt);
+    if ( ret < 0 )
+        goto err;
+
+    return 0;
+
+  err:
+    printk("Device tree generation failed (%d).\n", ret);
+    xfree(kinfo->fdt);
+    return -EINVAL;
+}
+
 int __init construct_dom0(struct domain *d)
 {
     struct kernel_info kinfo = {};
@@ -186,9 +297,17 @@ int __init construct_dom0(struct domain *d)
 
     printk("*** LOADING DOMAIN 0 ***\n");
 
-    printk("USING 256M FOR NOW (TODO: make this an option, and make default bigger)\n");
-    dom0_mem = MB(256);
-    d->max_pages = ~0U;
+    /* The ordering of operands is to work around a clang5 issue. */
+    if ( CONFIG_DOM0_MEM[0] && !dom0_mem_set )
+        parse_dom0_mem(CONFIG_DOM0_MEM);
+
+    if ( dom0_mem <= 0 )
+    {
+        warning_add("PLEASE SPECIFY dom0_mem PARAMETER - USING 512M FOR NOW\n");
+        dom0_mem = MB(512);
+    }
+
+    d->max_pages = dom0_mem >> PAGE_SHIFT;
 
     kinfo.unassigned_mem = dom0_mem;
     kinfo.d = d;
@@ -198,6 +317,15 @@ int __init construct_dom0(struct domain *d)
         return rc;
 
     allocate_memory(d, &kinfo);
+
+    if ( acpi_disabled )
+        rc = prepare_dtb_hwdom(d, &kinfo);
+    else
+        panic("TODO: ACPI\n");
+        /* rc = prepare_acpi(d, &kinfo); */
+
+    if ( rc < 0 )
+        return rc;
 
     return construct_domain(d, &kinfo);
 }

@@ -346,6 +346,18 @@ void __init start_xen(paddr_t fdt_paddr, paddr_t boot_phys_offset)
 
     vm_init();
 
+    if ( acpi_disabled )
+    {
+        printk("Booting using Device Tree\n");
+        dt_unflatten_host_device_tree();
+    }
+    else
+    {
+        panic("TODO: ACPI\n");
+        printk("Booting using ACPI\n");
+        device_tree_flattened = NULL;
+    }
+
     tasklet_subsys_init();
 
     do_presmp_initcalls();

@@ -6,8 +6,6 @@
 extern domid_t max_init_domid;
 
 #define NR_VCPUS 2
-#define DTB 0x80972000
-#define DTB_SIZE 3686
 
 /* Devices */
 #define PLIC_BASE  0xc000000
