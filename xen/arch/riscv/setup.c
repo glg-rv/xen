@@ -275,6 +275,8 @@ static void __init setup_mm(void)
 
     setup_frametable_mappings(ram_start, ram_end);
     max_page = PFN_DOWN(ram_end);
+
+    setup_fixmap_mappings();
 }
 
 /** start_xen - The C entry point
