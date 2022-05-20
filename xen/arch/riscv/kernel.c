@@ -223,6 +223,7 @@ int __init kernel_probe(struct kernel_info *info,
                         const struct dt_device_node *domain)
 {
     struct bootmodule *mod = NULL;
+    struct bootcmdline *cmd = NULL;
     int rc;
 
     /* domain is NULL only for the hardware domain */
@@ -235,12 +236,9 @@ int __init kernel_probe(struct kernel_info *info,
         info->kernel_bootmodule = mod;
         info->initrd_bootmodule = boot_module_find_by_kind(BOOTMOD_RAMDISK);
 
-        printk(XENLOG_ERR "TODO: get kernel cmdline bootmod\n");
-        /*
         cmd = boot_cmdline_find_by_kind(BOOTMOD_KERNEL);
         if ( cmd )
             info->cmdline = &cmd->cmdline[0];
-            */
     } else {
         BUG();
     }
