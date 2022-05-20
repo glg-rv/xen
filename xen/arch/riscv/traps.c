@@ -193,54 +193,66 @@ static void dump_csrs(unsigned long cause)
         wait_for_interrupt();
 }
 
+static void guest_sbi_putchar(struct cpu_user_regs *regs)
+{
+    sbi_console_putchar((int)regs->a0);
+}
+
 static void handle_guest_sbi(struct cpu_user_regs *regs)
 {
     unsigned long eid = regs->a7;
 
     switch ( eid )
     {
-	case SBI_EXT_0_1_SET_TIMER:
+    case SBI_EXT_0_1_SET_TIMER:
         printk("%s:%d: unimplemented: SBI_EXT_0_1_SET_TIMER\n",
                __FILE__, __LINE__);
-		break;
-	case SBI_EXT_0_1_CONSOLE_PUTCHAR:
-        printk("%s:%d: unimplemented: SBI_EXT_0_1_CONSOLE_PUTCHAR\n",
-               __FILE__, __LINE__);
-		break;
-	case SBI_EXT_0_1_CONSOLE_GETCHAR:
+        regs->a0 = SBI_ERR_NOT_SUPPORTED;
+        break;
+    case SBI_EXT_0_1_CONSOLE_PUTCHAR:
+        guest_sbi_putchar(regs);
+        break;
+    case SBI_EXT_0_1_CONSOLE_GETCHAR:
         printk("%s:%d: unimplemented: SBI_EXT_0_1_CONSOLE_GETCHAR\n",
                __FILE__, __LINE__);
-		break;
-	case SBI_EXT_0_1_CLEAR_IPI:
+        regs->a0 = SBI_ERR_NOT_SUPPORTED;
+        break;
+    case SBI_EXT_0_1_CLEAR_IPI:
         printk("%s:%d: unimplemented: SBI_EXT_0_1_CLEAR_IPI\n",
                __FILE__, __LINE__);
-		break;
-	case SBI_EXT_0_1_SEND_IPI:
+        regs->a0 = SBI_ERR_NOT_SUPPORTED;
+        break;
+    case SBI_EXT_0_1_SEND_IPI:
         printk("%s:%d: unimplemented: SBI_EXT_0_1_SEND_IPI\n",
-                __FILE__, __LINE__);
+               __FILE__, __LINE__);
+        regs->a0 = SBI_ERR_NOT_SUPPORTED;
         break;
-	case SBI_EXT_0_1_SHUTDOWN:
+    case SBI_EXT_0_1_SHUTDOWN:
         printk("%s:%d: unimplemented: SBI_EXT_0_1_SHUTDOWN\n",
-                __FILE__, __LINE__);
+               __FILE__, __LINE__);
+        regs->a0 = SBI_ERR_NOT_SUPPORTED;
         break;
-	case SBI_EXT_0_1_REMOTE_FENCE_I:
+    case SBI_EXT_0_1_REMOTE_FENCE_I:
         printk("%s:%d: unimplemented: SBI_EXT_0_1_REMOTE_FENCE_I\n",
                __FILE__, __LINE__);
+        regs->a0 = SBI_ERR_NOT_SUPPORTED;
         break;
-	case SBI_EXT_0_1_REMOTE_SFENCE_VMA:
+    case SBI_EXT_0_1_REMOTE_SFENCE_VMA:
         printk("%s:%d: unimplemented: SBI_EXT_0_1_REMOTE_SFENCE_VMA\n",
-                __FILE__, __LINE__);
+               __FILE__, __LINE__);
+        regs->a0 = SBI_ERR_NOT_SUPPORTED;
         break;
-	case SBI_EXT_0_1_REMOTE_SFENCE_VMA_ASID:
+    case SBI_EXT_0_1_REMOTE_SFENCE_VMA_ASID:
         printk("%s:%d: unimplemented: SBI_EXT_0_1_REMOTE_SFENCE_VMA_ASID\n",
-                __FILE__, __LINE__);
-		break;
-	default:
-        printk("UNKNOWN Guest SBI extension id\n");
-		break;
-	};
+               __FILE__, __LINE__);
+        regs->a0 = SBI_ERR_NOT_SUPPORTED;
+        break;
+    default:
+        printk("UNKNOWN Guest SBI extension id 0x%lx\n", eid);
+        regs->a0 = SBI_ERR_NOT_SUPPORTED;
+        break;
+    };
 
-    regs->a0 = SBI_ERR_NOT_SUPPORTED;
     advance_pc(regs);
 }
 
@@ -454,3 +466,4 @@ enum mc_disposition arch_do_multicall_call(struct mc_state *state)
     BUG();
     return mc_continue;
 }
+
