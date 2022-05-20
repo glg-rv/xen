@@ -21,12 +21,17 @@ static void context_switch_to_guest(struct vcpu *n)
 
     hedeleg = 0;
     hedeleg |= (1U << CAUSE_MISALIGNED_FETCH);
+    hedeleg |= (1U << CAUSE_FETCH_ACCESS);
+    hedeleg |= (1U << CAUSE_ILLEGAL_INSTRUCTION);
+    hedeleg |= (1U << CAUSE_MISALIGNED_LOAD);
+    hedeleg |= (1U << CAUSE_LOAD_ACCESS);
+    hedeleg |= (1U << CAUSE_MISALIGNED_STORE);
+    hedeleg |= (1U << CAUSE_STORE_ACCESS);
     hedeleg |= (1U << CAUSE_BREAKPOINT);
     hedeleg |= (1U << CAUSE_USER_ECALL);
     hedeleg |= (1U << CAUSE_FETCH_PAGE_FAULT);
     hedeleg |= (1U << CAUSE_LOAD_PAGE_FAULT);
     hedeleg |= (1U << CAUSE_STORE_PAGE_FAULT);
-    hedeleg |= (1U << EXCP_LOAD_GUEST_PAGE_FAULT);
     csr_write(CSR_HEDELEG, hedeleg);
 
     /* Enable all timers for guest */
