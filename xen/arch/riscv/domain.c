@@ -36,6 +36,11 @@ static void context_switch_to_guest(struct vcpu *n)
 
     /* Enable all timers for guest */
     csr_write(CSR_HCOUNTEREN, -1UL);
+
+    /* Enable floating point and other extensions for guest. */
+    /* TODO Disable them in Xen. */
+    csr_clear(CSR_SSTATUS, SR_FS | SR_XS);
+    csr_set(CSR_SSTATUS, SR_FS_INITIAL | SR_XS_INITIAL);
 }
 
 void context_switch(struct vcpu *prev, struct vcpu *next)

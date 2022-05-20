@@ -133,7 +133,7 @@ fail:
  * are added (yet) but one terminating reserve map entry (16 bytes) is
  * added.
  */
-#define DOM0_FDT_EXTRA_SIZE (128 + sizeof(struct fdt_reserve_entry))
+#define DOM0_FDT_EXTRA_SIZE (1024 + sizeof(struct fdt_reserve_entry))
 
 static void __init dtb_load(struct kernel_info *kinfo)
 {
@@ -241,12 +241,500 @@ static int __init construct_domain(struct domain *d, struct kernel_info *kinfo)
     return 0;
 }
 
+static int __init make_cpus_node(const struct domain *d, void *fdt)
+{
+    int res;
+    const struct dt_device_node *cpus = dt_find_node_by_path("/cpus");
+    const struct dt_device_node *npcpu;
+    unsigned int cpu;
+    const void *compatible = NULL, *isa = NULL, *mmu = NULL;
+    u32 len_compatible, len_isa, len_mmu;
+    u32 timebase_frequency;
+    bool frequency_valid;
+
+    dt_dprintk("Create cpus node\n");
+
+    if ( !cpus )
+    {
+        dprintk(XENLOG_ERR, "Missing /cpus node in the device tree?\n");
+        return -ENOENT;
+    }
+
+    
+    frequency_valid = dt_property_read_u32(cpus, "timebase-frequency",
+                                           &timebase_frequency);
+
+    /*
+     * Get the compatible property of CPUs from the device tree.
+     * We are assuming that all CPUs are the same so we are just look
+     * for the first one.
+     * TODO: Handle compatible per VCPU
+     */
+    dt_for_each_child_node(cpus, npcpu)
+    {
+        if ( dt_device_type_is_equal(npcpu, "cpu") )
+        {
+            compatible = dt_get_property(npcpu, "compatible", &len_compatible);
+            isa = dt_get_property(npcpu, "riscv,isa", &len_isa);
+            mmu = dt_get_property(npcpu, "mmu-type", &len_mmu);
+            break;
+        }
+    }
+
+    BUG_ON(!compatible || !mmu || !isa);
+
+    if ( !compatible )
+    {
+        dprintk(XENLOG_ERR, "Can't find cpu in the device tree?\n");
+        return -ENOENT;
+    }
+
+    /* See Linux Documentation/devicetree/booting-without-of.txt
+     * section III.5.b
+     */
+    res = fdt_begin_node(fdt, "cpus");
+    if ( res )
+        return res;
+
+    res = fdt_property_cell(fdt, "#address-cells", 1);
+    if ( res )
+        return res;
+
+    res = fdt_property_cell(fdt, "#size-cells", 0);
+    if ( res )
+        return res;
+    
+    if ( frequency_valid )
+    {
+        res = fdt_property_cell(fdt, "timebase-frequency", timebase_frequency);
+    }
+
+    for ( cpu = 0; cpu < d->max_vcpus; cpu++ )
+    {
+        char buf[13];
+        u32 reg = cpu_to_fdt32(cpu);
+
+        snprintf(buf, sizeof(buf), "cpu@%u", cpu);
+        res = fdt_begin_node(fdt, buf);
+        if ( res )
+            return res;
+        
+        res = fdt_property(fdt, "reg", &reg, sizeof(u32));
+        if ( res )
+            return res;
+
+        res = fdt_property_string(fdt, "status", "okay");
+        if ( res )
+            return res;
+
+        res = fdt_property(fdt, "compatible", compatible, len_compatible);
+        if ( res )
+            return res;
+
+        res = fdt_property(fdt, "mmu-type", mmu, len_mmu);
+        if ( res )
+            return res;
+
+        res = fdt_property(fdt, "riscv,isa", isa, len_isa);
+        if ( res )
+            return res;
+
+        res = fdt_property_string(fdt, "device_type", "cpu");
+        if ( res )
+            return res;
+
+        res = fdt_begin_node(fdt, "interrupt-controller");
+        if ( res )
+            return res;
+
+        res = fdt_property_string(fdt, "compatible", "riscv,cpu-intc");
+        if ( res )
+            return res;
+
+        res = fdt_property_cell(fdt, "#interrupt-cells", 1);
+        if ( res )
+            return res;
+
+        res = fdt_property(fdt, "interrupt-controller", NULL, 0);
+        if ( res )
+            return res;
+
+        /* end of interrupt-controller */
+        res = fdt_end_node(fdt);
+        if ( res )
+            return res;
+
+        res = fdt_end_node(fdt);
+        if ( res )
+            return res;
+    }
+
+    res = fdt_end_node(fdt);
+
+    return res;
+}
+
+static int __init make_memory_node(const struct domain *d,
+                                   void *fdt,
+                                   int addrcells, int sizecells,
+                                   struct meminfo *mem)
+{
+    int res, i;
+    int reg_size = addrcells + sizecells;
+    int nr_cells = reg_size * mem->nr_banks;
+    /* Placeholder for memory@ + a 64-bit number + \0 */
+    char buf[24];
+    __be32 reg[NR_MEM_BANKS * 4 /* Worst case addrcells + sizecells */];
+    __be32 *cells;
+
+    BUG_ON(nr_cells >= ARRAY_SIZE(reg));
+    if ( mem->nr_banks == 0 )
+        return -ENOENT;
+
+    dt_dprintk("Create memory node (reg size %d, nr cells %d)\n",
+               reg_size, nr_cells);
+
+    /* ePAPR 3.4 */
+    snprintf(buf, sizeof(buf), "memory@%"PRIx64, mem->bank[0].start);
+    res = fdt_begin_node(fdt, buf);
+    if ( res )
+        return res;
+
+    res = fdt_property_string(fdt, "device_type", "memory");
+    if ( res )
+        return res;
+
+    cells = &reg[0];
+    for ( i = 0 ; i < mem->nr_banks; i++ )
+    {
+        u64 start = mem->bank[i].start;
+        u64 size = mem->bank[i].size;
+
+        dt_dprintk("  Bank %d: %#"PRIx64"->%#"PRIx64"\n",
+                   i, start, start + size);
+
+        dt_child_set_range(&cells, addrcells, sizecells, start, size);
+    }
+
+    res = fdt_property(fdt, "reg", reg, nr_cells * sizeof(*reg));
+    if ( res )
+        return res;
+
+    res = fdt_end_node(fdt);
+
+    return res;
+}
+
+static int __init make_plic_node(const struct kernel_info *kinfo)
+{
+    /* TODO */
+    return 0;
+}
+
+static int __init make_timer_node(const struct kernel_info *kinfo)
+{
+    /* TODO */
+    return 0;
+}
+
+
+static int __init make_hypervisor_node(struct domain *d,
+                                       const struct kernel_info *kinfo,
+                                       int addrcells, int sizecells)
+{
+    /* TODO */
+    return 0;
+}
+
+static int __init write_properties(struct domain *d, struct kernel_info *kinfo,
+                                   const struct dt_device_node *node)
+{
+    const char *bootargs = NULL;
+    const struct dt_property *prop, *status = NULL;
+    int res = 0;
+    int had_dom0_bootargs = 0;
+    struct dt_device_node *iommu_node;
+
+    if ( kinfo->cmdline && kinfo->cmdline[0] )
+        bootargs = &kinfo->cmdline[0];
+
+    /*
+     * We always skip the IOMMU device when creating DT for hwdom if there is
+     * an appropriate driver for it in Xen (device_get_class(iommu_node)
+     * returns DEVICE_IOMMU).
+     * We should also skip the IOMMU specific properties of the master device
+     * behind that IOMMU in order to avoid exposing an half complete IOMMU
+     * bindings to hwdom.
+     * Use "iommu_node" as an indicator of the master device which properties
+     * should be skipped.
+     */
+    iommu_node = dt_parse_phandle(node, "iommus", 0);
+    /* TODO
+    if ( iommu_node && device_get_class(iommu_node) != DEVICE_IOMMU )
+        iommu_node = NULL;
+    */
+
+    dt_for_each_property_node (node, prop)
+    {
+        const void *prop_data = prop->value;
+        u32 prop_len = prop->length;
+
+        /*
+         * In chosen node:
+         *
+         * * remember xen,dom0-bootargs if we don't already have
+         *   bootargs (from module #1, above).
+         * * remove bootargs,  xen,dom0-bootargs, xen,xen-bootargs,
+         *   linux,initrd-start and linux,initrd-end.
+         * * remove stdout-path.
+         * * remove bootargs, linux,uefi-system-table,
+         *   linux,uefi-mmap-start, linux,uefi-mmap-size,
+         *   linux,uefi-mmap-desc-size, and linux,uefi-mmap-desc-ver
+         *   (since EFI boot is not currently supported in dom0).
+         */
+        if ( dt_node_path_is_equal(node, "/chosen") )
+        {
+            if ( dt_property_name_is_equal(prop, "xen,xen-bootargs") ||
+                 dt_property_name_is_equal(prop, "linux,initrd-start") ||
+                 dt_property_name_is_equal(prop, "linux,initrd-end") ||
+                 dt_property_name_is_equal(prop, "stdout-path") ||
+                 dt_property_name_is_equal(prop, "linux,uefi-system-table") ||
+                 dt_property_name_is_equal(prop, "linux,uefi-mmap-start") ||
+                 dt_property_name_is_equal(prop, "linux,uefi-mmap-size") ||
+                 dt_property_name_is_equal(prop, "linux,uefi-mmap-desc-size") ||
+                 dt_property_name_is_equal(prop, "linux,uefi-mmap-desc-ver"))
+                continue;
+
+            if ( dt_property_name_is_equal(prop, "xen,dom0-bootargs") )
+            {
+                had_dom0_bootargs = 1;
+                bootargs = prop->value;
+                continue;
+            }
+            if ( dt_property_name_is_equal(prop, "bootargs") )
+            {
+                if ( !bootargs  && !had_dom0_bootargs )
+                    bootargs = prop->value;
+                continue;
+            }
+        }
+
+        /* Don't expose the property "xen,passthrough" to the guest */
+        if ( dt_property_name_is_equal(prop, "xen,passthrough") )
+            continue;
+
+        /* Remember and skip the status property as Xen may modify it later */
+        if ( dt_property_name_is_equal(prop, "status") )
+        {
+            status = prop;
+            continue;
+        }
+
+        if ( iommu_node )
+        {
+            /* Don't expose IOMMU specific properties to hwdom */
+            if ( dt_property_name_is_equal(prop, "iommus") )
+                continue;
+
+            if ( dt_property_name_is_equal(prop, "iommu-map") )
+                continue;
+
+            if ( dt_property_name_is_equal(prop, "iommu-map-mask") )
+                continue;
+        }
+
+        res = fdt_property(kinfo->fdt, prop->name, prop_data, prop_len);
+
+        if ( res )
+            return res;
+    }
+
+    /*
+     * Override the property "status" to disable the device when it's
+     * marked for passthrough.
+     */
+    if ( dt_device_for_passthrough(node) )
+        res = fdt_property_string(kinfo->fdt, "status", "disabled");
+    else if ( status )
+        res = fdt_property(kinfo->fdt, "status", status->value,
+                           status->length);
+
+    if ( res )
+        return res;
+
+    if ( dt_node_path_is_equal(node, "/chosen") )
+    {
+        const struct bootmodule *initrd = kinfo->initrd_bootmodule;
+
+        if ( bootargs )
+        {
+            res = fdt_property(kinfo->fdt, "bootargs", bootargs,
+                               strlen(bootargs) + 1);
+            if ( res )
+                return res;
+        }
+
+        /*
+         * If the bootloader provides an initrd, we must create a placeholder
+         * for the initrd properties. The values will be replaced later.
+         */
+        if ( initrd && initrd->size )
+        {
+            u64 a = 0;
+            res = fdt_property(kinfo->fdt, "linux,initrd-start", &a, sizeof(a));
+            if ( res )
+                return res;
+
+            res = fdt_property(kinfo->fdt, "linux,initrd-end", &a, sizeof(a));
+            if ( res )
+                return res;
+        }
+    }
+
+    return 0;
+}
+
 static int __init handle_node(struct domain *d, struct kernel_info *kinfo,
                               struct dt_device_node *node,
                               p2m_type_t p2mt)
 {
-    /* TODO */
-    return 0;
+    static const struct dt_device_match skip_matches[] __initconst =
+    {
+        DT_MATCH_COMPATIBLE("xen,xen"),
+        DT_MATCH_COMPATIBLE("xen,multiboot-module"),
+        DT_MATCH_COMPATIBLE("multiboot,module"),
+        DT_MATCH_COMPATIBLE("syscon-poweroff"),
+        DT_MATCH_COMPATIBLE("syscon-reboot"),
+        DT_MATCH_PATH("/cpus"),
+        DT_MATCH_TYPE("memory"),
+        { /* sentinel */ },
+    };
+    static const struct dt_device_match plic_matches[] __initconst =
+    {
+        DT_MATCH_COMPATIBLE("riscv,plic"),
+        { /* sentinel */ },
+    };
+    static const struct dt_device_match timer_matches[] __initconst =
+    {
+        DT_MATCH_COMPATIBLE("riscv,clint"),
+        { /* sentinel */ },
+    };
+    static const struct dt_device_match reserved_matches[] __initconst =
+    {
+        DT_MATCH_PATH("/memory"),
+        DT_MATCH_PATH("/hypervisor"),
+        { /* sentinel */ },
+    };
+    struct dt_device_node *child;
+    const char *name;
+    const char *path;
+    int res;
+
+    path = dt_node_full_name(node);
+
+    dt_dprintk("handle %s\n", path);
+
+    /* Skip theses nodes and the sub-nodes */
+    if ( dt_match_node(skip_matches, node) )
+    {
+        dt_dprintk("  Skip it (matched)\n");
+        return 0;
+    }
+
+    /*
+     * Replace these nodes with our own. Note that the original may be
+     * used_by DOMID_XEN so this check comes first.
+     */
+    if ( dt_match_node(plic_matches, node) )
+        return make_plic_node(kinfo);
+
+    if ( dt_match_node(timer_matches, node) )
+        return make_timer_node(kinfo);
+
+    /* Skip nodes used by Xen */
+    if ( dt_device_used_by(node) == DOMID_XEN )
+    {
+        dt_dprintk("  Skip it (used by Xen)\n");
+        return 0;
+    }
+
+    /*
+     * Even if the IOMMU device is not used by Xen, it should not be
+     * passthrough to DOM0
+     */
+    /* TODO skip IOMMU */
+
+    /*
+     * Xen is using some path for its own purpose. Warn if a node
+     * already exists with the same path.
+     */
+    if ( dt_match_node(reserved_matches, node) )
+        printk(XENLOG_WARNING
+               "WARNING: Path %s is reserved, skip the node as we may re-use the path.\n",
+               path);
+
+    /* TODO handle_device */
+
+    /*
+     * The property "name" is used to have a different name on older FDT
+     * version. We want to keep the name retrieved during the tree
+     * structure creation, that is store in the node path.
+     */
+    name = strrchr(path, '/');
+    name = name ? name + 1 : path;
+
+    res = fdt_begin_node(kinfo->fdt, name);
+    if ( res )
+        return res;
+
+    res = write_properties(d, kinfo, node);
+    if ( res )
+        return res;
+
+    for ( child = node->child; child != NULL; child = child->sibling )
+    {
+        res = handle_node(d, kinfo, child, p2mt);
+        if ( res )
+            return res;
+    }
+
+    if ( node == dt_host )
+    {
+        int addrcells = dt_child_n_addr_cells(node);
+        int sizecells = dt_child_n_size_cells(node);
+
+        /*
+         * The hypervisor node should always be created after all nodes
+         * from the host DT have been parsed.
+         */
+        res = make_hypervisor_node(d, kinfo, addrcells, sizecells);
+        if ( res )
+            return res;
+
+        res = make_cpus_node(d, kinfo->fdt);
+        if ( res )
+            return res;
+
+        res = make_memory_node(d, kinfo->fdt, addrcells, sizecells, &kinfo->mem);
+        if ( res )
+            return res;
+
+        /*
+         * Create a second memory node to store the ranges covering
+         * reserved-memory regions.
+         */
+        if ( bootinfo.reserved_mem.nr_banks > 0 )
+        {
+            res = make_memory_node(d, kinfo->fdt, addrcells, sizecells,
+                                   &bootinfo.reserved_mem);
+            if ( res )
+                return res;
+        }
+    }
+
+    res = fdt_end_node(kinfo->fdt);
+
+    return res;
 }
 
 static int __init prepare_dtb_hwdom(struct domain *d, struct kernel_info *kinfo)
