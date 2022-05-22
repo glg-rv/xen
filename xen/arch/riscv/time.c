@@ -22,12 +22,13 @@
 #include <xen/event.h>
 #include <xen/cpu.h>
 #include <xen/notifier.h>
+#include <asm/acpi.h>
 #include <asm/system.h>
 #include <asm/time.h>
 
-#define QEMU_TIMEBASE_FREQ 0x989680
-
 unsigned long __read_mostly cpu_khz;  /* CPU clock frequency in kHz. */
+
+uint32_t __read_mostly timer_dt_clock_frequency;
 
 uint64_t __read_mostly boot_count;
 
@@ -36,10 +37,37 @@ s_time_t ticks_to_ns(uint64_t ticks)
     return muldiv64(ticks, SECONDS(1), 1000 * cpu_khz);
 }
 
+/* Set up the timer on the boot CPU (early init function) */
+static void __init preinit_dt_xen_time(void)
+{
+    static const struct dt_device_match dt_cpus[] __initconst =
+    {
+        DT_MATCH_PATH("/cpus"),
+        { /* sentinel */ },
+    };
+    int res;
+    u32 rate;
+    struct dt_device_node *cpus_node;
+
+    cpus_node = dt_find_matching_node(NULL, dt_cpus);
+    if ( !cpus_node )
+        panic("No cpus node in device tree.\n");
+
+    res = dt_property_read_u32(cpus_node, "timebase-frequency", &rate);
+    if ( !res )
+        panic("Unable to find clock frequency.\n");
+    cpu_khz = rate / 1000;
+    timer_dt_clock_frequency = rate;
+}
+
 void __init preinit_xen_time(void)
 {
-    /* TODO: get from DT cpus { timebase-frequency } */
-    cpu_khz = QEMU_TIMEBASE_FREQ / 1000;
+    if ( acpi_disabled )
+        preinit_dt_xen_time();
+    else
+        panic("TODO ACPI\n");
+
+    boot_count = get_cycles();
 }
 
 /* Set up the timer on the boot CPU (late init function) */
