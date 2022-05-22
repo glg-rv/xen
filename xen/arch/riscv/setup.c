@@ -288,11 +288,6 @@ static void __init setup_mm(void)
  */
 void __init start_xen(paddr_t fdt_paddr, paddr_t boot_phys_offset)
 {
-    struct ns16550_defaults ns16550 = {
-        .data_bits = 8,
-        .parity    = 'n',
-        .stop_bits = 1
-    };
     struct domain *dom0;
     struct xen_domctl_createdomain dom0_cfg = {
         .flags = XEN_DOMCTL_CDF_hvm | XEN_DOMCTL_CDF_hap,
@@ -377,10 +372,6 @@ void __init start_xen(paddr_t fdt_paddr, paddr_t boot_phys_offset)
 
     plic_preinit();
 
-    ns16550.io_base = 0x10000000;
-    ns16550.irq     = 10;
-    ns16550.baud    = 115200;
-    /* ns16550_init(0, &ns16550); */
     uart_init();
     console_init_preirq();
     console_init_ring();
