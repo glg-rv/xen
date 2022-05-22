@@ -24,6 +24,7 @@ obj-y   += vm_event.o
 obj-y   += vplic.o
 obj-y   += device.o
 obj-y   += uart.o
+obj-y   += plic.o
 
 #obj-bin-y += ....o
 

@@ -49,6 +49,7 @@
 #include <asm/setup.h>
 #include <asm/traps.h>
 #include <xsm/xsm.h>
+#include <asm/plic.h>
 
 extern void uart_init(void);
 
@@ -307,6 +308,8 @@ void __init start_xen(paddr_t fdt_paddr, paddr_t boot_phys_offset)
 
     nr_cpu_ids = NR_CPUS;
 
+    percpu_init_areas();
+
     setup_virtual_regions(NULL, NULL);
     smp_clear_cpu_maps();
     
@@ -333,8 +336,6 @@ void __init start_xen(paddr_t fdt_paddr, paddr_t boot_phys_offset)
     printk("Command line: %s\n", cmdline);
     cmdline_parse(cmdline);
 
-    init_xen_time();
-
     setup_mm();
     end_boot_allocator();
 
@@ -343,8 +344,6 @@ void __init start_xen(paddr_t fdt_paddr, paddr_t boot_phys_offset)
      * memory subsystem has been initialized.
      */
     system_state = SYS_STATE_boot;
-
-    percpu_init_areas();
 
     vm_init();
 
@@ -374,6 +373,10 @@ void __init start_xen(paddr_t fdt_paddr, paddr_t boot_phys_offset)
         }
     }
 
+    preinit_xen_time();
+
+    plic_preinit();
+
     ns16550.io_base = 0x10000000;
     ns16550.irq     = 10;
     ns16550.baud    = 115200;
@@ -383,6 +386,8 @@ void __init start_xen(paddr_t fdt_paddr, paddr_t boot_phys_offset)
     console_init_ring();
 
     printk("RISC-V Xen Boot!\n");
+
+    init_xen_time();
 
     timer_init();
 
