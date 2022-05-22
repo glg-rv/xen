@@ -182,6 +182,13 @@ SECTIONS
     PROVIDE(_data_end = .);
   }
 
+  . = ALIGN(8);
+  .dev.info : {
+      _sdevice = .;
+      *(.dev.info)
+      _edevice = .;
+  } :text
+
   . = ALIGN(PAGE_SIZE);             /* Init code and data */
   __init_begin = .;
   .init.text : {
