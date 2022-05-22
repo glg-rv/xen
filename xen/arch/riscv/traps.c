@@ -250,6 +250,7 @@ static void handle_guest_sbi(struct cpu_user_regs *regs)
         break;
     case SBI_EXT_BASE:
         regs->a0 = SBI_ERR_NOT_SUPPORTED;
+        break;
     default:
         printk("UNKNOWN Guest SBI extension id 0x%lx\n", eid);
         regs->a0 = SBI_ERR_NOT_SUPPORTED;
