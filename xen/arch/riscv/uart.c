@@ -123,7 +123,7 @@ static void __init acpi_uart_init(void)
 static void __init acpi_uart_init(void) { }
 #endif
 
-void __init riscv_uart_init(void)
+void __init uart_init(void)
 {
     if ( acpi_disabled )
         dt_uart_init();

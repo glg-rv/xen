@@ -50,7 +50,7 @@
 #include <asm/traps.h>
 #include <xsm/xsm.h>
 
-extern void riscv_uart_init(void);
+extern void uart_init(void);
 
 static void setup_trap_handler(void)
 {
@@ -378,7 +378,7 @@ void __init start_xen(paddr_t fdt_paddr, paddr_t boot_phys_offset)
     ns16550.irq     = 10;
     ns16550.baud    = 115200;
     /* ns16550_init(0, &ns16550); */
-    riscv_uart_init();
+    uart_init();
     console_init_preirq();
     console_init_ring();
 
