@@ -196,6 +196,7 @@ static void dump_csrs(unsigned long cause)
 static void guest_sbi_putchar(struct cpu_user_regs *regs)
 {
     sbi_console_putchar((int)regs->a0);
+    regs->a0 = 0;
 }
 
 static void handle_guest_sbi(struct cpu_user_regs *regs)
@@ -247,6 +248,8 @@ static void handle_guest_sbi(struct cpu_user_regs *regs)
                __FILE__, __LINE__);
         regs->a0 = SBI_ERR_NOT_SUPPORTED;
         break;
+    case SBI_EXT_BASE:
+        regs->a0 = SBI_ERR_NOT_SUPPORTED;
     default:
         printk("UNKNOWN Guest SBI extension id 0x%lx\n", eid);
         regs->a0 = SBI_ERR_NOT_SUPPORTED;
