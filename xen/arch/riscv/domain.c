@@ -40,8 +40,8 @@ static void context_switch_to_guest(struct vcpu *n)
 
     /* Enable floating point and other extensions for guest. */
     /* TODO Disable them in Xen. */
-    csr_clear(CSR_SSTATUS, SR_FS | SR_XS);
-    csr_set(CSR_SSTATUS, SR_FS_INITIAL | SR_XS_INITIAL);
+    csr_clear(CSR_SSTATUS, SSTATUS_FS | SSTATUS_XS);
+    csr_set(CSR_SSTATUS, SSTATUS_FS_INITIAL | SSTATUS_XS_INITIAL);
 }
 
 void context_switch(struct vcpu *prev, struct vcpu *next)

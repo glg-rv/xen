@@ -17,7 +17,7 @@ handle_exception:
      * After the swap, if a guest trapped, tp will have a pointer to pcpu_info of the guest.
      * After the swap, If xen trapped, tp will be empty.
      */
-    csrrw   tp, CSR_SCRATCH, tp
+    csrrw   tp, CSR_SSCRATCH, tp
 
     /* Based on Linux kenrel arch/riscv/entry.S */
     bnez    tp, save_to_cpuinfo
@@ -25,7 +25,7 @@ handle_exception:
     /* Exceptions from xen */
 save_to_stack:  
     /* Restore xen tp */
-	csrrw   tp, CSR_SCRATCH, tp
+	csrrw   tp, CSR_SSCRATCH, tp
     /* Save context to stack */
     REG_S   sp, (RISCV_CPU_USER_REGS_OFFSET(sp) - RISCV_CPU_USER_REGS_SIZE) (sp)
     addi    sp, sp, -RISCV_CPU_USER_REGS_SIZE
@@ -102,11 +102,11 @@ save_context:
     REG_L   sp, RISCV_CPU_USER_REGS_OFFSET(sp)(sp)
 
     /* Back up thread pointer to sscratch */
-    csrrw   tp, CSR_SCRATCH, tp
+    csrrw   tp, CSR_SSCRATCH, tp
     bnez    tp, to_sret
 
     /* sscratch will be empty if trapped from xen */
-    csrrw   tp, CSR_SCRATCH, tp
+    csrrw   tp, CSR_SSCRATCH, tp
 
 to_sret:    
     sret
@@ -121,7 +121,7 @@ ENTRY(return_to_new_vcpu64)
     REG_S   sp, RISCV_PCPUINFO_OFFSET(cpu_info)(tp)
 
     /* Backup tp into sscratch */
-    csrrw    tp, CSR_SCRATCH, tp
+    csrrw    tp, CSR_SSCRATCH, tp
 
     /* Set vCPU registers */
     REG_L   t0, RISCV_CPU_USER_REGS_OFFSET(sepc)(sp)

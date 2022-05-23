@@ -130,8 +130,8 @@ unsigned long riscv_vcpu_unpriv_read(struct vcpu *vcpu,
 		  [taddr] "+&r" (taddr), [ttmp] "+&r" (ttmp),
 		  [addr] "+&r" (addr) : : "memory");
 
-		if (trap->scause == EXCP_LOAD_PAGE_FAULT)
-			trap->scause = EXCP_INST_PAGE_FAULT;
+		if (trap->scause == CAUSE_LOAD_PAGE_FAULT)
+			trap->scause = CAUSE_FETCH_PAGE_FAULT;
 	} else {
 		/*
 		 * HLV.D instruction

@@ -57,43 +57,41 @@ const char *decode_trap_cause(unsigned long cause)
 {
     switch ( cause )
     {
-    case EXCP_INST_ADDR_MIS:
+    case CAUSE_MISALIGNED_FETCH:
         return "Instruction Address Misaligned";
-    case EXCP_INST_ACCESS_FAULT:
+    case CAUSE_FETCH_ACCESS:
         return "Instruction Access Fault";
-    case EXCP_ILLEGAL_INST:
+    case CAUSE_ILLEGAL_INSTRUCTION:
         return "Illegal Instruction";
-    case EXCP_BREAKPOINT:
+    case CAUSE_BREAKPOINT:
         return "Breakpoint";
-    case EXCP_LOAD_ADDR_MIS:
+    case CAUSE_MISALIGNED_LOAD:
         return "Load Address Misaligned";
-    case EXCP_LOAD_ACCESS_FAULT:
+    case CAUSE_LOAD_ACCESS:
         return "Load Access Fault";
-    case EXCP_STORE_AMO_ADDR_MIS:
+    case CAUSE_MISALIGNED_STORE:
         return "Store/AMO Address Misaligned";
-    case EXCP_STORE_AMO_ACCESS_FAULT:
+    case CAUSE_STORE_ACCESS:
         return "Store/AMO Access Fault";
-    case EXCP_U_ECALL:
+    case CAUSE_USER_ECALL:
         return "Environment Call from U-Mode";
-    case EXCP_S_ECALL:
+    case CAUSE_SUPERVISOR_ECALL:
         return "Environment Call from S-Mode";
-    case EXCP_M_ECALL:
+    case CAUSE_MACHINE_ECALL:
         return "Environment Call from M-Mode";
-    case EXCP_INST_PAGE_FAULT:
+    case CAUSE_FETCH_PAGE_FAULT:
         return "Instruction Page Fault";
-    case EXCP_LOAD_PAGE_FAULT:
+    case CAUSE_LOAD_PAGE_FAULT:
         return "Load Page Fault";
-    case EXCP_STORE_PAGE_FAULT:
+    case CAUSE_STORE_PAGE_FAULT:
         return "Store/AMO Page Fault";
-    case EXCP_SEMIHOST:
-        return "SEMIHOST";
-    case EXCP_INST_GUEST_PAGE_FAULT:
+    case CAUSE_FETCH_GUEST_PAGE_FAULT:
         return "Instruction Guest Page Fault";
-    case EXCP_LOAD_GUEST_PAGE_FAULT:
+    case CAUSE_LOAD_GUEST_PAGE_FAULT:
         return "Load Guest Page Fault";
-    case EXCP_VIRT_INSTRUCTION_FAULT:
+    case CAUSE_VIRTUAL_INST_FAULT:
         return "Virtualized Instruction Fault";
-    case EXCP_STORE_GUEST_PAGE_FAULT:
+    case CAUSE_STORE_GUEST_PAGE_FAULT:
         return "Guest Store/AMO Page Fault";
     default:
         return "UNKNOWN";
@@ -117,7 +115,7 @@ const char *decode_reserved_interrupt_cause(unsigned long irq_cause)
 
 const char *decode_interrupt_cause(unsigned long cause)
 {
-    unsigned long irq_cause = cause & ~SCAUSE_INTERRUPT_MASK;
+    unsigned long irq_cause = cause & ~CAUSE_IRQ_FLAG;
 
     switch ( irq_cause )
     {
@@ -134,7 +132,7 @@ const char *decode_interrupt_cause(unsigned long cause)
 
 const char *decode_cause(unsigned long cause)
 {
-    if ( cause & SCAUSE_INTERRUPT_MASK )
+    if ( cause & CAUSE_IRQ_FLAG )
         return decode_interrupt_cause(cause);
 
     return decode_trap_cause(cause);
@@ -182,7 +180,6 @@ static void dump_csrs(unsigned long cause)
     printk("\t\thstatus.SPVP=%d\n", !!(hstatus & HSTATUS_SPVP));
     printk("\t\thstatus.SPV=%d\n", !!(hstatus & HSTATUS_SPV));
     printk("\t\thstatus.GVA=%d\n", !!(hstatus & HSTATUS_GVA));
-    printk("\t\thstatus.SPRV=%d\n", !!(hstatus & HSTATUS_SPRV));
     print_csr(CSR_HGATP);
     print_csr(CSR_HTVAL);
     print_csr(CSR_HTINST);
@@ -400,20 +397,20 @@ static void handle_guest_page_fault(unsigned long cause, struct cpu_user_regs *r
 {
     unsigned long addr;
 
-    BUG_ON(cause != EXCP_LOAD_GUEST_PAGE_FAULT && cause != EXCP_STORE_GUEST_PAGE_FAULT);
+    BUG_ON(cause != CAUSE_LOAD_GUEST_PAGE_FAULT && cause != CAUSE_STORE_GUEST_PAGE_FAULT);
 
     addr = get_faulting_gpa();
 
     printk("%s: TODO: handle faulted guest IO %s @ addr 0x%02lx\n",
             __func__,
-            (cause == EXCP_LOAD_GUEST_PAGE_FAULT) ? "load" : "store",
+            (cause == CAUSE_LOAD_GUEST_PAGE_FAULT) ? "load" : "store",
             addr);
 
-    if ( cause == EXCP_LOAD_GUEST_PAGE_FAULT )
+    if ( cause == CAUSE_LOAD_GUEST_PAGE_FAULT )
     {
         emulate_load(current, get_faulting_gpa(), csr_read(CSR_HTINST));
     }
-    else if ( cause == EXCP_STORE_GUEST_PAGE_FAULT )
+    else if ( cause == CAUSE_STORE_GUEST_PAGE_FAULT )
     {
         printk("TODO: emulate_store()\n");
         advance_pc(regs);
@@ -425,11 +422,11 @@ void __handle_exception(void)
     unsigned long cause = csr_read(CSR_SCAUSE);
     struct cpu_user_regs *regs = guest_cpu_user_regs();
 
-    if ( cause & SCAUSE_INTERRUPT_MASK )
+    if ( cause & CAUSE_IRQ_FLAG )
     {
         /* Handle interrupt */
-        cause &= ~SCAUSE_INTERRUPT_MASK;
-        switch ( cause )
+        unsigned long icause = cause & ~CAUSE_IRQ_FLAG;
+        switch ( icause )
         {
         case IRQ_S_TIMER:
             timer_interrupt(cause, regs);
@@ -443,11 +440,11 @@ void __handle_exception(void)
     {
         switch ( cause )
         {
-        case EXCP_VS_ECALL:
+        case CAUSE_VIRTUAL_SUPERVISOR_ECALL:
             handle_guest_sbi(regs);
             break;
-        case EXCP_LOAD_GUEST_PAGE_FAULT:
-        case EXCP_STORE_GUEST_PAGE_FAULT:
+        case CAUSE_LOAD_GUEST_PAGE_FAULT:
+        case CAUSE_STORE_GUEST_PAGE_FAULT:
             handle_guest_page_fault(cause, regs);
             break;
         default:

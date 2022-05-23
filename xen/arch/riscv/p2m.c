@@ -72,7 +72,7 @@ static void p2m_force_tlb_flush_sync(struct p2m_domain *p2m)
 
 static paddr_t get_p2m_root_pt_mfn(struct domain *d)
 {
-    return (p2m_get_hostp2m(d)->hgatp & SATP_PPN) << PAGE_SHIFT;
+    return (p2m_get_hostp2m(d)->hgatp & HGATP_PPN) << PAGE_SHIFT;
 }
 
 mfn_t p2m_lookup(struct domain *d, gfn_t gfn, p2m_type_t *t)
@@ -280,7 +280,7 @@ static unsigned long hgatp_from_page_info(struct page_info *page_info)
 
     /* ASID not supported yet */
 
-    return ppn | HGATP_MODE;
+    return ppn | (HGATP_MODE_SV39X4 << HGATP_MODE_SHIFT);
 }
 
 static int p2m_alloc_table(struct domain *d)

@@ -17,7 +17,7 @@ _start:
 	 * Disable FPU to detect illegal usage of
 	 * floating point in kernel space
 	 */
-	li t0, SR_FS
+	li t0, SSTATUS_FS
 	csrc CSR_SSTATUS, t0
 
 	/* Save HART ID and DTB base */

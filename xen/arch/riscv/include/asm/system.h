@@ -65,30 +65,30 @@ static inline unsigned long local_save_flags(void)
 
 static inline void local_irq_enable(void)
 {
-	csr_set(sstatus, SR_SIE);
+	csr_set(sstatus, SSTATUS_SIE);
 }
 
 static inline void local_irq_disable(void)
 {
-	csr_clear(sstatus, SR_SIE);
+	csr_clear(sstatus, SSTATUS_SIE);
 }
 
 #define local_irq_save(x)                     \
 ({                                            \
-    x = csr_read_clear(CSR_SSTATUS, SR_SIE);      \
+    x = csr_read_clear(CSR_SSTATUS, SSTATUS_SIE);      \
     local_irq_disable();                      \
 })
 
 static inline void local_irq_restore(unsigned long flags)
 {
-	csr_set(CSR_SSTATUS, flags & SR_SIE);
+	csr_set(CSR_SSTATUS, flags & SSTATUS_SIE);
 }
 
 static inline int local_irq_is_enabled(void)
 {
     unsigned long flags = local_save_flags();
 
-    return flags & SR_SIE;
+    return flags & SSTATUS_SIE;
 }
 
 #define arch_fetch_and_add(x, v) __sync_fetch_and_add(x, v)

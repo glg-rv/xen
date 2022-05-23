@@ -839,7 +839,7 @@ _setup_initial_pagetables(unsigned long load_addr_start,
 
     /* Enable the MMU and load the new pagetable for Xen */
     csr_write(CSR_SATP,
-              (load_addr(xen_second_pagetable) >> PAGE_SHIFT) | SATP_MODE);
+              (load_addr(xen_second_pagetable) >> PAGE_SHIFT) | SATP_MODE_SV39 << SATP_MODE_SHIFT);
 
     phys_offset = load_addr_start - linker_addr_start;
 }
