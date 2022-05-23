@@ -23,9 +23,7 @@ handle_exception:
     bnez    tp, save_to_cpuinfo
 
     /* Exceptions from xen */
-save_to_stack:  
-    /* Restore xen tp */
-	csrrw   tp, CSR_SSCRATCH, tp
+save_to_stack:
     /* Save context to stack */
     REG_S   sp, (RISCV_CPU_USER_REGS_OFFSET(sp) - RISCV_CPU_USER_REGS_SIZE) (sp)
     addi    sp, sp, -RISCV_CPU_USER_REGS_SIZE
@@ -44,7 +42,14 @@ save_to_cpuinfo:
     REG_S   t0, RISCV_CPU_USER_REGS_OFFSET(sp)(sp)
 
 save_context:
-    /* Save caller-saved registers */
+    /* Save registers */
+    REG_S   ra, RISCV_CPU_USER_REGS_OFFSET(ra)(sp)
+    REG_S   gp, RISCV_CPU_USER_REGS_OFFSET(gp)(sp)
+    REG_S   t0, RISCV_CPU_USER_REGS_OFFSET(t0)(sp)
+    REG_S   t1, RISCV_CPU_USER_REGS_OFFSET(t1)(sp)
+    REG_S   t2, RISCV_CPU_USER_REGS_OFFSET(t2)(sp)
+    REG_S   s0, RISCV_CPU_USER_REGS_OFFSET(s0)(sp)
+    REG_S   s1, RISCV_CPU_USER_REGS_OFFSET(s1)(sp)
     REG_S   a0, RISCV_CPU_USER_REGS_OFFSET(a0)(sp)
     REG_S   a1, RISCV_CPU_USER_REGS_OFFSET(a1)(sp)
     REG_S   a2, RISCV_CPU_USER_REGS_OFFSET(a2)(sp)
@@ -53,34 +58,55 @@ save_context:
     REG_S   a5, RISCV_CPU_USER_REGS_OFFSET(a5)(sp)
     REG_S   a6, RISCV_CPU_USER_REGS_OFFSET(a6)(sp)
     REG_S   a7, RISCV_CPU_USER_REGS_OFFSET(a7)(sp)
-    REG_S   t0, RISCV_CPU_USER_REGS_OFFSET(t0)(sp)
-    REG_S   t1, RISCV_CPU_USER_REGS_OFFSET(t1)(sp)
-    REG_S   t2, RISCV_CPU_USER_REGS_OFFSET(t2)(sp)
+    REG_S   s2, RISCV_CPU_USER_REGS_OFFSET(s2)(sp)
+    REG_S   s3, RISCV_CPU_USER_REGS_OFFSET(s3)(sp)
+    REG_S   s4, RISCV_CPU_USER_REGS_OFFSET(s4)(sp)
+    REG_S   s5, RISCV_CPU_USER_REGS_OFFSET(s5)(sp)
+    REG_S   s6, RISCV_CPU_USER_REGS_OFFSET(s6)(sp)
+    REG_S   s7, RISCV_CPU_USER_REGS_OFFSET(s7)(sp)
+    REG_S   s8, RISCV_CPU_USER_REGS_OFFSET(s8)(sp)
+    REG_S   s9, RISCV_CPU_USER_REGS_OFFSET(s9)(sp)
+    REG_S   s10, RISCV_CPU_USER_REGS_OFFSET(s10)(sp)
+    REG_S   s11, RISCV_CPU_USER_REGS_OFFSET(s11)(sp)
     REG_S   t3, RISCV_CPU_USER_REGS_OFFSET(t3)(sp)
     REG_S   t4, RISCV_CPU_USER_REGS_OFFSET(t4)(sp)
     REG_S   t5, RISCV_CPU_USER_REGS_OFFSET(t5)(sp)
     REG_S   t6, RISCV_CPU_USER_REGS_OFFSET(t6)(sp)
-    REG_S   ra, RISCV_CPU_USER_REGS_OFFSET(ra)(sp)
-
-    /* Save sepc */
-    csrr    t0, sepc
+    csrr    t0, CSR_SEPC
     REG_S   t0, RISCV_CPU_USER_REGS_OFFSET(sepc)(sp)
+    csrr    t0, CSR_SSTATUS
+    REG_S   t0, RISCV_CPU_USER_REGS_OFFSET(sstatus)(sp)
 
-    /* Save hstatus */
-    csrr    t0, hstatus
-    REG_S   t0, RISCV_CPU_USER_REGS_OFFSET(hstatus)(sp)
+    /* Save guest tp. Set sscratch to non-zero */
+    csrrw   tp, CSR_SSCRATCH, tp
+    REG_S   tp, RISCV_CPU_USER_REGS_OFFSET(tp)(sp)
+    li      t1, 1
+    mv      t2, tp
+    csrrw   tp, CSR_SSCRATCH, t1
+    bnez    tp, finish_save_context
+    /* tp == 0 */
+    mv      tp, t2
+    /* Set sscratch zero if trapped from xen */
+    csrw    CSR_SSCRATCH, zero
 
+finish_save_context:
     jal __handle_exception
 
-    /* Restore hstatus */
-    REG_L   t0, RISCV_CPU_USER_REGS_OFFSET(hstatus)(sp)
-    csrw    hstatus, t0
+    /* Save tp */
+    csrw    CSR_SSCRATCH, tp
 
-    /* Restore sepc */
+restore_registers:
     REG_L   t0, RISCV_CPU_USER_REGS_OFFSET(sepc)(sp)
-    csrw    sepc, t0
-
-    /* Restore caller-saved registers */
+    csrw    CSR_SEPC, t0
+    REG_L   t0, RISCV_CPU_USER_REGS_OFFSET(sstatus)(sp)
+    csrw    CSR_SSTATUS, t0
+    REG_L   ra, RISCV_CPU_USER_REGS_OFFSET(ra)(sp)
+    REG_L   gp, RISCV_CPU_USER_REGS_OFFSET(gp)(sp)
+    REG_L   t0, RISCV_CPU_USER_REGS_OFFSET(t0)(sp)
+    REG_L   t1, RISCV_CPU_USER_REGS_OFFSET(t1)(sp)
+    REG_L   t2, RISCV_CPU_USER_REGS_OFFSET(t2)(sp)
+    REG_L   s0, RISCV_CPU_USER_REGS_OFFSET(s0)(sp)
+    REG_L   s1, RISCV_CPU_USER_REGS_OFFSET(s1)(sp)
     REG_L   a0, RISCV_CPU_USER_REGS_OFFSET(a0)(sp)
     REG_L   a1, RISCV_CPU_USER_REGS_OFFSET(a1)(sp)
     REG_L   a2, RISCV_CPU_USER_REGS_OFFSET(a2)(sp)
@@ -89,26 +115,26 @@ save_context:
     REG_L   a5, RISCV_CPU_USER_REGS_OFFSET(a5)(sp)
     REG_L   a6, RISCV_CPU_USER_REGS_OFFSET(a6)(sp)
     REG_L   a7, RISCV_CPU_USER_REGS_OFFSET(a7)(sp)
-    REG_L   t0, RISCV_CPU_USER_REGS_OFFSET(t0)(sp)
-    REG_L   t1, RISCV_CPU_USER_REGS_OFFSET(t1)(sp)
-    REG_L   t2, RISCV_CPU_USER_REGS_OFFSET(t2)(sp)
+    REG_L   s2, RISCV_CPU_USER_REGS_OFFSET(s2)(sp)
+    REG_L   s3, RISCV_CPU_USER_REGS_OFFSET(s3)(sp)
+    REG_L   s4, RISCV_CPU_USER_REGS_OFFSET(s4)(sp)
+    REG_L   s5, RISCV_CPU_USER_REGS_OFFSET(s5)(sp)
+    REG_L   s6, RISCV_CPU_USER_REGS_OFFSET(s6)(sp)
+    REG_L   s7, RISCV_CPU_USER_REGS_OFFSET(s7)(sp)
+    REG_L   s8, RISCV_CPU_USER_REGS_OFFSET(s8)(sp)
+    REG_L   s9, RISCV_CPU_USER_REGS_OFFSET(s9)(sp)
+    REG_L   s10, RISCV_CPU_USER_REGS_OFFSET(s10)(sp)
+    REG_L   s11, RISCV_CPU_USER_REGS_OFFSET(s11)(sp)
     REG_L   t3, RISCV_CPU_USER_REGS_OFFSET(t3)(sp)
     REG_L   t4, RISCV_CPU_USER_REGS_OFFSET(t4)(sp)
     REG_L   t5, RISCV_CPU_USER_REGS_OFFSET(t5)(sp)
     REG_L   t6, RISCV_CPU_USER_REGS_OFFSET(t6)(sp)
-    REG_L   ra, RISCV_CPU_USER_REGS_OFFSET(ra)(sp)
 
+    /* Restore tp */
+    REG_L   tp, RISCV_CPU_USER_REGS_OFFSET(tp)(sp)
     /* Restore sp */
     REG_L   sp, RISCV_CPU_USER_REGS_OFFSET(sp)(sp)
 
-    /* Back up thread pointer to sscratch */
-    csrrw   tp, CSR_SSCRATCH, tp
-    bnez    tp, to_sret
-
-    /* sscratch will be empty if trapped from xen */
-    csrrw   tp, CSR_SSCRATCH, tp
-
-to_sret:    
     sret
 
 _hang:

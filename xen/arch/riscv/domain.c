@@ -85,6 +85,8 @@ void context_switch(struct vcpu *prev, struct vcpu *next)
     context_save_csrs(prev);
     context_restore_csrs(next);
 
+    tp->cpu_info = next->arch.cpu_info;
+
     /* TODO Handle floating point registers */
     prev = __context_switch(prev, next);
 

@@ -60,11 +60,9 @@
 #define RISCV_CPU_USER_REGS_t4		    29
 #define RISCV_CPU_USER_REGS_t5		    30
 #define RISCV_CPU_USER_REGS_t6		    31
-#define RISCV_CPU_USER_REGS_sepc		32
-#define RISCV_CPU_USER_REGS_sstatus	    33 
-#define RISCV_CPU_USER_REGS_hstatus	    34
-#define RISCV_CPU_USER_REGS_sp_exec		35
-#define RISCV_CPU_USER_REGS_last		36
+#define RISCV_CPU_USER_REGS_sepc       	    32
+#define RISCV_CPU_USER_REGS_sstatus    	    33
+#define RISCV_CPU_USER_REGS_last	    34
 
 #define RISCV_CPU_USER_REGS_OFFSET(x)	((RISCV_CPU_USER_REGS_##x) * __SIZEOF_POINTER__)
 #define RISCV_CPU_USER_REGS_SIZE		RISCV_CPU_USER_REGS_OFFSET(last)
@@ -99,42 +97,40 @@ extern struct pcpu_info pcpu_info[NR_CPUS];
 /* On stack VCPU state */
 struct cpu_user_regs
 {
-	register_t zero;
-	register_t ra;
-	register_t sp;
-	register_t gp;
-	register_t tp;
-	register_t t0;
-	register_t t1;
-	register_t t2;
-	register_t s0;
-	register_t s1;
-	register_t a0;
-	register_t a1;
-	register_t a2;
-	register_t a3;
-	register_t a4;
-	register_t a5;
-	register_t a6;
-	register_t a7;
-	register_t s2;
-	register_t s3;
-	register_t s4;
-	register_t s5;
-	register_t s6;
-	register_t s7;
-	register_t s8;
-	register_t s9;
-	register_t s10;
-	register_t s11;
-	register_t t3;
-	register_t t4;
-	register_t t5;
-	register_t t6;
-	register_t sepc;
-	register_t sstatus;
-	register_t hstatus;
-	register_t sp_exec;
+    register_t zero;
+    register_t ra;
+    register_t sp;
+    register_t gp;
+    register_t tp;
+    register_t t0;
+    register_t t1;
+    register_t t2;
+    register_t s0;
+    register_t s1;
+    register_t a0;
+    register_t a1;
+    register_t a2;
+    register_t a3;
+    register_t a4;
+    register_t a5;
+    register_t a6;
+    register_t a7;
+    register_t s2;
+    register_t s3;
+    register_t s4;
+    register_t s5;
+    register_t s6;
+    register_t s7;
+    register_t s8;
+    register_t s9;
+    register_t s10;
+    register_t s11;
+    register_t t3;
+    register_t t4;
+    register_t t5;
+    register_t t6;
+    register_t sepc;
+    register_t sstatus;
 };
 
 void show_execution_state(const struct cpu_user_regs *regs);
@@ -162,3 +158,12 @@ static inline void wait_for_interrupt(void)
 #endif /* __ASSEMBLY__ */
 
 #endif /* _ASM_RISCV_PROCESSOR_H */
+
+/*
+ * Local variables:
+ * mode: C
+ * c-file-style: "BSD"
+ * c-basic-offset: 4
+ * indent-tabs-mode: nil
+ * End:
+ */
