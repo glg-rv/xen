@@ -19,8 +19,20 @@ handle_exception:
      */
     csrrw   tp, CSR_SCRATCH, tp
 
-    /* TODO: handle empty TP, i.e., traps from xen */
+    /* Based on Linux kenrel arch/riscv/entry.S */
+    bnez    tp, save_to_cpuinfo
 
+    /* Exceptions from xen */
+save_to_stack:  
+    /* Restore xen tp */
+	csrrw   tp, CSR_SCRATCH, tp
+    /* Save context to stack */
+    REG_S   sp, (RISCV_CPU_USER_REGS_OFFSET(sp) - RISCV_CPU_USER_REGS_SIZE) (sp)
+    addi    sp, sp, -RISCV_CPU_USER_REGS_SIZE
+    j       save_context
+
+    /* Exceptions from guest */
+save_to_cpuinfo:
     /* tp->tmp = sp */
     REG_S   sp, RISCV_PCPUINFO_OFFSET(tmp)(tp)
 
@@ -31,7 +43,8 @@ handle_exception:
     REG_L   t0, RISCV_PCPUINFO_OFFSET(tmp)(tp)
     REG_S   t0, RISCV_CPU_USER_REGS_OFFSET(sp)(sp)
 
-    /* Save registers */
+save_context:
+    /* Save caller-saved registers */
     REG_S   a0, RISCV_CPU_USER_REGS_OFFSET(a0)(sp)
     REG_S   a1, RISCV_CPU_USER_REGS_OFFSET(a1)(sp)
     REG_S   a2, RISCV_CPU_USER_REGS_OFFSET(a2)(sp)
@@ -40,8 +53,13 @@ handle_exception:
     REG_S   a5, RISCV_CPU_USER_REGS_OFFSET(a5)(sp)
     REG_S   a6, RISCV_CPU_USER_REGS_OFFSET(a6)(sp)
     REG_S   a7, RISCV_CPU_USER_REGS_OFFSET(a7)(sp)
-
-    /* Save return address register */
+    REG_S   t0, RISCV_CPU_USER_REGS_OFFSET(t0)(sp)
+    REG_S   t1, RISCV_CPU_USER_REGS_OFFSET(t1)(sp)
+    REG_S   t2, RISCV_CPU_USER_REGS_OFFSET(t2)(sp)
+    REG_S   t3, RISCV_CPU_USER_REGS_OFFSET(t3)(sp)
+    REG_S   t4, RISCV_CPU_USER_REGS_OFFSET(t4)(sp)
+    REG_S   t5, RISCV_CPU_USER_REGS_OFFSET(t5)(sp)
+    REG_S   t6, RISCV_CPU_USER_REGS_OFFSET(t6)(sp)
     REG_S   ra, RISCV_CPU_USER_REGS_OFFSET(ra)(sp)
 
     /* Save sepc */
@@ -54,8 +72,6 @@ handle_exception:
 
     jal __handle_exception
 
-    REG_L   sp, RISCV_PCPUINFO_OFFSET(cpu_info)(tp)
-
     /* Restore hstatus */
     REG_L   t0, RISCV_CPU_USER_REGS_OFFSET(hstatus)(sp)
     csrw    hstatus, t0
@@ -64,7 +80,7 @@ handle_exception:
     REG_L   t0, RISCV_CPU_USER_REGS_OFFSET(sepc)(sp)
     csrw    sepc, t0
 
-    /* Restore general purpose registers */
+    /* Restore caller-saved registers */
     REG_L   a0, RISCV_CPU_USER_REGS_OFFSET(a0)(sp)
     REG_L   a1, RISCV_CPU_USER_REGS_OFFSET(a1)(sp)
     REG_L   a2, RISCV_CPU_USER_REGS_OFFSET(a2)(sp)
@@ -73,15 +89,26 @@ handle_exception:
     REG_L   a5, RISCV_CPU_USER_REGS_OFFSET(a5)(sp)
     REG_L   a6, RISCV_CPU_USER_REGS_OFFSET(a6)(sp)
     REG_L   a7, RISCV_CPU_USER_REGS_OFFSET(a7)(sp)
-
-    /* Restore return address register */
+    REG_L   t0, RISCV_CPU_USER_REGS_OFFSET(t0)(sp)
+    REG_L   t1, RISCV_CPU_USER_REGS_OFFSET(t1)(sp)
+    REG_L   t2, RISCV_CPU_USER_REGS_OFFSET(t2)(sp)
+    REG_L   t3, RISCV_CPU_USER_REGS_OFFSET(t3)(sp)
+    REG_L   t4, RISCV_CPU_USER_REGS_OFFSET(t4)(sp)
+    REG_L   t5, RISCV_CPU_USER_REGS_OFFSET(t5)(sp)
+    REG_L   t6, RISCV_CPU_USER_REGS_OFFSET(t6)(sp)
     REG_L   ra, RISCV_CPU_USER_REGS_OFFSET(ra)(sp)
 
+    /* Restore sp */
     REG_L   sp, RISCV_CPU_USER_REGS_OFFSET(sp)(sp)
 
     /* Back up thread pointer to sscratch */
-    csrrw tp, CSR_SCRATCH, tp
+    csrrw   tp, CSR_SCRATCH, tp
+    bnez    tp, to_sret
 
+    /* sscratch will be empty if trapped from xen */
+    csrrw   tp, CSR_SCRATCH, tp
+
+to_sret:    
     sret
 
 _hang:

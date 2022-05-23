@@ -14,6 +14,8 @@
 #ifndef _ASM_RISCV_TIMEX_H
 #define _ASM_RISCV_TIMEX_H
 
+#include <asm/processor.h>
+
 typedef unsigned long cycles_t;
 
 static inline cycles_t get_cycles_inline(void)
@@ -55,6 +57,10 @@ static inline int read_current_timer(unsigned long *timer_val)
 	return 0;
 }
 
-void preinit_xen_time(void);
+extern void preinit_xen_time(void);
+
+extern void init_timer_interrupt(void);
+
+extern void timer_interrupt(unsigned long cause, struct cpu_user_regs *regs);
 
 #endif /* _ASM_RISCV_TIMEX_H */

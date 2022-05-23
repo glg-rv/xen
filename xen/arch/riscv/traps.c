@@ -117,7 +117,7 @@ const char *decode_reserved_interrupt_cause(unsigned long irq_cause)
 
 const char *decode_interrupt_cause(unsigned long cause)
 {
-    unsigned long irq_cause = cause & EXCP_INT_MASK;
+    unsigned long irq_cause = cause & ~SCAUSE_INTERRUPT_MASK;
 
     switch ( irq_cause )
     {
@@ -134,7 +134,7 @@ const char *decode_interrupt_cause(unsigned long cause)
 
 const char *decode_cause(unsigned long cause)
 {
-    if ( cause & EXCP_INT_FLAG )
+    if ( cause & SCAUSE_INTERRUPT_MASK )
         return decode_interrupt_cause(cause);
 
     return decode_trap_cause(cause);
@@ -425,18 +425,35 @@ void __handle_exception(void)
     unsigned long cause = csr_read(CSR_SCAUSE);
     struct cpu_user_regs *regs = guest_cpu_user_regs();
 
-    switch ( cause )
+    if ( cause & SCAUSE_INTERRUPT_MASK )
     {
-    case EXCP_VS_ECALL:
-        handle_guest_sbi(regs);
-        break;
-    case EXCP_LOAD_GUEST_PAGE_FAULT:
-    case EXCP_STORE_GUEST_PAGE_FAULT:
-        handle_guest_page_fault(cause, regs);
-        break;
-    default:
-        dump_csrs(cause);
-        break;
+        /* Handle interrupt */
+        cause &= ~SCAUSE_INTERRUPT_MASK;
+        switch ( cause )
+        {
+        case IRQ_S_TIMER:
+            timer_interrupt(cause, regs);
+            break;
+        default:
+            dump_csrs(cause);
+            break;
+        }
+    }
+    else
+    {
+        switch ( cause )
+        {
+        case EXCP_VS_ECALL:
+            handle_guest_sbi(regs);
+            break;
+        case EXCP_LOAD_GUEST_PAGE_FAULT:
+        case EXCP_STORE_GUEST_PAGE_FAULT:
+            handle_guest_page_fault(cause, regs);
+            break;
+        default:
+            dump_csrs(cause);
+            break;
+        }
     }
 }
 

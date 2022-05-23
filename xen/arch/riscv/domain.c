@@ -3,6 +3,7 @@
 #include <xen/lib.h>
 #include <xen/sched.h>
 #include <xen/domain.h>
+#include <xen/softirq.h>
 #include <public/domctl.h>
 #include <public/xen.h>
 
@@ -56,6 +57,34 @@ void context_switch(struct vcpu *prev, struct vcpu *next)
 
     local_irq_enable();
     sched_context_switched(prev, current);
+}
+
+
+
+void idle_loop(void)
+{
+    unsigned int cpu = smp_processor_id();
+
+    printk("%s\n", __func__);
+
+    for ( ; ; )
+    {
+        if ( unlikely(tasklet_work_to_do(cpu)) )
+            do_tasklet();
+        do_softirq();
+    }
+}
+
+void noreturn startup_cpu_idle_loop(void)
+{
+    struct vcpu *v = current;
+
+    ASSERT(is_idle_vcpu(v));
+
+    reset_stack_and_jump(idle_loop);
+
+    /* This function is noreturn */
+    BUG();
 }
 
 void continue_running(struct vcpu *same)

@@ -25,6 +25,7 @@
 #include <asm/acpi.h>
 #include <asm/system.h>
 #include <asm/time.h>
+#include <asm/sbi.h>
 
 unsigned long __read_mostly cpu_khz;  /* CPU clock frequency in kHz. */
 
@@ -32,9 +33,14 @@ uint32_t __read_mostly timer_dt_clock_frequency;
 
 uint64_t __read_mostly boot_count;
 
-s_time_t ticks_to_ns(uint64_t ticks)
+static inline s_time_t ticks_to_ns(uint64_t ticks)
 {
     return muldiv64(ticks, SECONDS(1), 1000 * cpu_khz);
+}
+
+static inline uint64_t ns_to_ticks(s_time_t ns)
+{
+    return muldiv64(ns, 1000 * cpu_khz, SECONDS(1));
 }
 
 /* Set up the timer on the boot CPU (early init function) */
@@ -107,6 +113,37 @@ void domain_set_time_offset(struct domain *d, int64_t time_offset_seconds)
 
 int reprogram_timer(s_time_t timeout)
 {
-    /* TODO */
+    uint64_t deadline, now;
+
+    if (timeout == 0)
+    {
+        /* Disable timers */
+        csr_clear(CSR_SIE, 1ul << IRQ_S_TIMER);
+        return 1;
+    }
+    
+    deadline = ns_to_ticks(timeout) + boot_count;
+    now = get_cycles();
+    if (deadline <= now)
+        return 0;
+
+    /* Enable timer */
+    sbi_set_timer(deadline);
+    csr_set(CSR_SIE, 1ul << IRQ_S_TIMER);
+
     return 1;
+}
+
+void timer_interrupt(unsigned long cause, struct cpu_user_regs *regs)
+{
+    /* Disable the timer to avoid more interrupts */
+    csr_clear(CSR_SIE, 1ul << IRQ_S_TIMER);
+
+    /* Signal the generic timer code to do its work */
+    raise_softirq(TIMER_SOFTIRQ);
+}
+
+/* Set up the timer interrupt on this CPU */
+void init_timer_interrupt(void)
+{
 }

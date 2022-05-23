@@ -60,34 +60,6 @@ static void setup_trap_handler(void)
     printk("CSR_STVEC=0x%02lx\n", csr_read(CSR_STVEC));
 }
 
-void idle_loop(void)
-{
-    unsigned int cpu = smp_processor_id();
-
-    printk("%s\n", __func__);
-
-    for ( ; ; )
-    {
-        if ( unlikely(tasklet_work_to_do(cpu)) )
-            do_tasklet();
-        do_softirq();
-    }
-}
-
-void startup_cpu_idle_loop(void)
-{
-    struct vcpu *v = current;
-
-    printk("%s\n", __func__);
-
-    ASSERT(is_idle_vcpu(v));
-
-    reset_stack_and_jump(idle_loop);
-
-    /* This function is noreturn */
-    while (1);
-}
-
 static __used void init_done(void)
 {
     /* TODO: free init memory */
@@ -379,6 +351,8 @@ void __init start_xen(paddr_t fdt_paddr, paddr_t boot_phys_offset)
     printk("RISC-V Xen Boot!\n");
 
     init_xen_time();
+
+    init_timer_interrupt();
 
     timer_init();
 
