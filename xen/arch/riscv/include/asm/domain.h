@@ -52,9 +52,26 @@ struct arch_domain
 
 struct arch_vcpu
 {
+    /* Callee-saved registers and tp, gp, ra */
     struct {
-        register_t pc;
+        register_t s0;
+        register_t s1;
+        register_t s2;
+        register_t s3;
+        register_t s4;
+        register_t s5;
+        register_t s6;
+        register_t s7;
+        register_t s8;
+        register_t s9;
+        register_t s10;
+        register_t s11;
+
         register_t sp;
+        register_t gp;
+
+        /* ra is used to jump to guest when creating new vcpu */
+        register_t ra;
     } saved_context;
 
     struct cpu_info *cpu_info;
@@ -79,9 +96,22 @@ static inline void arch_vcpu_block(struct vcpu *v) {}
 
 #endif /* !__ASSEMBLY__ */
 
-#define VCPU_SAVED_CONTEXT_pc               0
-#define VCPU_SAVED_CONTEXT_sp               1
-#define VCPU_SAVED_CONTEXT_last             2
+#define VCPU_SAVED_CONTEXT_s0               0
+#define VCPU_SAVED_CONTEXT_s1               1
+#define VCPU_SAVED_CONTEXT_s2               2
+#define VCPU_SAVED_CONTEXT_s3               3
+#define VCPU_SAVED_CONTEXT_s4               4
+#define VCPU_SAVED_CONTEXT_s5               5
+#define VCPU_SAVED_CONTEXT_s6               6
+#define VCPU_SAVED_CONTEXT_s7               7
+#define VCPU_SAVED_CONTEXT_s8               8
+#define VCPU_SAVED_CONTEXT_s9               9
+#define VCPU_SAVED_CONTEXT_s10              10
+#define VCPU_SAVED_CONTEXT_s11              11
+#define VCPU_SAVED_CONTEXT_sp               12
+#define VCPU_SAVED_CONTEXT_gp               13
+#define VCPU_SAVED_CONTEXT_ra               14
+#define VCPU_SAVED_CONTEXT_last             15
 #define VCPU_SAVED_CONTEXT_OFFSET(x)	\
     (VCPU_arch_saved_context + ((VCPU_SAVED_CONTEXT_##x) * __SIZEOF_POINTER__))
 #define VCPU_SAVED_CONTEXT_SIZE		    VCPU_SAVED_CONTEXT_OFFSET(last)

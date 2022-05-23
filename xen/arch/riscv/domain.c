@@ -265,10 +265,10 @@ int arch_vcpu_create(struct vcpu *v)
     memset(v->arch.cpu_info, 0, sizeof(*v->arch.cpu_info));
 
     v->arch.saved_context.sp = (register_t)v->arch.cpu_info;
-    v->arch.saved_context.pc = (register_t)continue_new_vcpu;
+    v->arch.saved_context.ra = (register_t)continue_new_vcpu;
 
     printk(XENLOG_INFO "Create vCPU with sp=0x%02lx, pc=0x%02lx\n",
-            v->arch.saved_context.sp, v->arch.saved_context.pc);
+            v->arch.saved_context.sp, v->arch.saved_context.ra);
 
     v->arch.vplic = vplic_alloc();
 
