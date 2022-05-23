@@ -4,6 +4,7 @@
 #include <xen/sched.h>
 #include <xen/domain.h>
 #include <xen/softirq.h>
+#include <asm/vtimer.h>
 #include <public/domctl.h>
 #include <public/xen.h>
 
@@ -81,6 +82,9 @@ void context_switch(struct vcpu *prev, struct vcpu *next)
 
     p2m_save_state(prev);
     p2m_restore_state(next);
+
+    vtimer_save(prev);
+    vtimer_restore(next);
 
     context_save_csrs(prev);
     context_restore_csrs(next);
@@ -177,10 +181,23 @@ int arch_sanitise_domain_config(struct xen_domctl_createdomain *config)
 int arch_domain_create(struct domain *d,
                        struct xen_domctl_createdomain *config)
 {
-    if ( d->domain_id == DOMID_IDLE )
+    int rc = 0;
+
+    if ( is_idle_domain(d) )
         return 0;
 
-    return p2m_init(d);
+    if ( (rc = p2m_init(d)) != 0)
+        goto fail;
+
+    if ( (rc = domain_vtimer_init(d, &config->arch)) != 0 )
+        goto fail;
+
+    return rc;
+    
+fail:
+    d->is_dying = DOMDYING_dead;
+    arch_domain_destroy(d);
+    return rc;
 }
 
 void arch_domain_destroy(struct domain *d)
@@ -318,6 +335,8 @@ static void vcpu_csr_init(struct vcpu *v)
 
 int arch_vcpu_create(struct vcpu *v)
 {
+    int rc = 0;
+
     BUILD_BUG_ON( sizeof(struct cpu_info) > STACK_SIZE );
 
     v->arch.stack = alloc_xenheap_pages(STACK_ORDER, MEMF_node(vcpu_to_node(v)));
@@ -347,7 +366,14 @@ int arch_vcpu_create(struct vcpu *v)
 
     vcpu_csr_init(v);
 
-    return 0;
+    if ( (rc = vcpu_vtimer_init(v)) != 0 )
+        goto fail;
+
+    return rc;
+
+ fail:
+    arch_vcpu_destroy(v);
+    return rc;
 }
 
 void arch_vcpu_destroy(struct vcpu *v)

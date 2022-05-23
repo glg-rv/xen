@@ -15,8 +15,19 @@
 #define _ASM_RISCV_TIMEX_H
 
 #include <asm/processor.h>
+#include <xen/lib.h>
 
 typedef unsigned long cycles_t;
+
+static inline s_time_t ticks_to_ns(uint64_t ticks)
+{
+    return muldiv64(ticks, SECONDS(1), 1000 * cpu_khz);
+}
+
+static inline uint64_t ns_to_ticks(s_time_t ns)
+{
+    return muldiv64(ns, 1000 * cpu_khz, SECONDS(1));
+}
 
 static inline cycles_t get_cycles_inline(void)
 {
@@ -62,5 +73,8 @@ extern void preinit_xen_time(void);
 extern void init_timer_interrupt(void);
 
 extern void timer_interrupt(unsigned long cause, struct cpu_user_regs *regs);
+
+
+extern uint64_t boot_count;
 
 #endif /* _ASM_RISCV_TIMEX_H */

@@ -35,10 +35,7 @@ enum domain_type {
 
 struct vtimer {
         struct vcpu *v;
-        int irq;
         struct timer timer;
-        uint32_t ctl;
-        uint64_t cval;
 };
 
 struct arch_domain
@@ -78,6 +75,8 @@ struct arch_vcpu
     struct cpu_info *cpu_info;
     void *stack;
     struct vplic *vplic;
+    struct vtimer vtimer;
+    bool vtimer_initialized;
 
     /* CSRs */
     register_t hstatus;

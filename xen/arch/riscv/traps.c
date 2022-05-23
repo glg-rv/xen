@@ -34,6 +34,7 @@
 #include <asm/sbi.h>
 #include <asm/traps.h>
 #include <asm/guest_access.h>
+#include <asm/vtimer.h>
 
 /* Included just for hardcoded values during development */
 #include <asm/setup.h>
@@ -190,6 +191,13 @@ static void dump_csrs(unsigned long cause)
         wait_for_interrupt();
 }
 
+static void guest_sbi_set_timer(struct cpu_user_regs *regs)
+{
+    struct vcpu *v = current;
+    vtimer_set_timer(&v->arch.vtimer, regs->a0);
+    regs->a0 = 0;
+}
+
 static void guest_sbi_putchar(struct cpu_user_regs *regs)
 {
     sbi_console_putchar((int)regs->a0);
@@ -203,9 +211,7 @@ static void handle_guest_sbi(struct cpu_user_regs *regs)
     switch ( eid )
     {
     case SBI_EXT_0_1_SET_TIMER:
-        printk("%s:%d: unimplemented: SBI_EXT_0_1_SET_TIMER\n",
-               __FILE__, __LINE__);
-        regs->a0 = SBI_ERR_NOT_SUPPORTED;
+        guest_sbi_set_timer(regs);
         break;
     case SBI_EXT_0_1_CONSOLE_PUTCHAR:
         guest_sbi_putchar(regs);

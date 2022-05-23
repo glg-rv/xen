@@ -25,6 +25,7 @@ obj-y   += vplic.o
 obj-y   += device.o
 obj-y   += uart.o
 obj-y   += plic.o
+obj-y 	+= vtimer.o
 
 #obj-bin-y += ....o
 

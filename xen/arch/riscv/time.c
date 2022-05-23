@@ -33,16 +33,6 @@ uint32_t __read_mostly timer_dt_clock_frequency;
 
 uint64_t __read_mostly boot_count;
 
-static inline s_time_t ticks_to_ns(uint64_t ticks)
-{
-    return muldiv64(ticks, SECONDS(1), 1000 * cpu_khz);
-}
-
-static inline uint64_t ns_to_ticks(s_time_t ns)
-{
-    return muldiv64(ns, 1000 * cpu_khz, SECONDS(1));
-}
-
 /* Set up the timer on the boot CPU (early init function) */
 static void __init preinit_dt_xen_time(void)
 {
@@ -94,8 +84,7 @@ s_time_t get_s_time(void)
 /* VCPU PV timers. */
 void send_timer_event(struct vcpu *v)
 {
-    /* TODO */
-    BUG();
+    v->arch.hvip |= MIP_VSTIP;
 }
 
 /* VCPU PV clock. */
