@@ -133,13 +133,6 @@ ENTRY(return_to_new_vcpu64)
     /* DTB goes to a1 */
     REG_L   a1, RISCV_CPU_USER_REGS_OFFSET(a1)(sp)
 
-    /* Set hstatus */
-    add     t0, zero, zero
-    or      t0, t0, HSTATUS_SPV
-    or      t0, t0, HSTATUS_SPVP
-
-    csrw    CSR_HSTATUS, t0
-
     /* Set guest mode to supervisor */
     li      t0, SSTATUS_SPP
     csrs    CSR_SSTATUS, t0

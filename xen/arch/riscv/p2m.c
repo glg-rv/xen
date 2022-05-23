@@ -40,7 +40,6 @@ void dump_p2m_lookup(struct domain *d, paddr_t addr)
 
 void p2m_save_state(struct vcpu *p)
 {
-    /* TODO */
 }
 
 void p2m_restore_state(struct vcpu *n)
@@ -49,8 +48,6 @@ void p2m_restore_state(struct vcpu *n)
 
     if ( is_idle_vcpu(n) )
         return;
-
-    printk("HGATP=0x%02lx\n", p2m->hgatp);
 
     csr_write(CSR_HGATP, p2m->hgatp);
 }

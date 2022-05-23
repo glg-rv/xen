@@ -14,47 +14,80 @@ struct vcpu *alloc_dom0_vcpu0(struct domain *dom0)
     return vcpu_create(dom0, 0);
 }
 
-static void context_switch_to_guest(struct vcpu *n)
+static void context_save_csrs(struct vcpu *vcpu)
 {
-    unsigned long hedeleg;
+    vcpu->arch.hstatus = csr_read(CSR_HSTATUS);
+    vcpu->arch.hedeleg = csr_read(CSR_HEDELEG);
+    vcpu->arch.hideleg = csr_read(CSR_HIDELEG);
+    vcpu->arch.hvip = csr_read(CSR_HVIP);
+    vcpu->arch.hip = csr_read(CSR_HIP);
+    vcpu->arch.hie = csr_read(CSR_HIE);
+    vcpu->arch.hgeie = csr_read(CSR_HGEIE);
+    vcpu->arch.henvcfg = csr_read(CSR_HENVCFG);
+    vcpu->arch.hcounteren = csr_read(CSR_HCOUNTEREN);
+    vcpu->arch.htimedelta = csr_read(CSR_HTIMEDELTA);
+    vcpu->arch.htval = csr_read(CSR_HTVAL);
+    vcpu->arch.htinst = csr_read(CSR_HTINST);
+#ifdef CONFIG_32BIT
+    vcpu->arch.henvcfgh = csr_read(CSR_HENVCFGH);
+    vcpu->arch.htimedeltah = csr_read(CSR_HTIMEDELTAH);
+#endif
 
-    p2m_restore_state(n);
+    vcpu->arch.vsstatus = csr_read(CSR_VSSTATUS);
+    vcpu->arch.vsip = csr_read(CSR_VSIP);
+    vcpu->arch.vsie = csr_read(CSR_VSIE);
+    vcpu->arch.vstvec = csr_read(CSR_VSTVEC);
+    vcpu->arch.vsscratch = csr_read(CSR_VSSCRATCH);
+    vcpu->arch.vscause = csr_read(CSR_VSCAUSE);
+    vcpu->arch.vstval = csr_read(CSR_VSTVAL);
+    vcpu->arch.vsatp = csr_read(CSR_VSATP);
+}
 
-    hedeleg = 0;
-    hedeleg |= (1U << CAUSE_MISALIGNED_FETCH);
-    hedeleg |= (1U << CAUSE_FETCH_ACCESS);
-    hedeleg |= (1U << CAUSE_ILLEGAL_INSTRUCTION);
-    hedeleg |= (1U << CAUSE_MISALIGNED_LOAD);
-    hedeleg |= (1U << CAUSE_LOAD_ACCESS);
-    hedeleg |= (1U << CAUSE_MISALIGNED_STORE);
-    hedeleg |= (1U << CAUSE_STORE_ACCESS);
-    hedeleg |= (1U << CAUSE_BREAKPOINT);
-    hedeleg |= (1U << CAUSE_USER_ECALL);
-    hedeleg |= (1U << CAUSE_FETCH_PAGE_FAULT);
-    hedeleg |= (1U << CAUSE_LOAD_PAGE_FAULT);
-    hedeleg |= (1U << CAUSE_STORE_PAGE_FAULT);
-    csr_write(CSR_HEDELEG, hedeleg);
+static void context_restore_csrs(struct vcpu *vcpu)
+{
+    csr_write(CSR_HSTATUS, vcpu->arch.hstatus);
+    csr_write(CSR_HEDELEG, vcpu->arch.hedeleg);
+    csr_write(CSR_HIDELEG, vcpu->arch.hideleg);
+    csr_write(CSR_HVIP, vcpu->arch.hvip);
+    csr_write(CSR_HIP, vcpu->arch.hip);
+    csr_write(CSR_HIE, vcpu->arch.hie);
+    csr_write(CSR_HGEIE, vcpu->arch.hgeie);
+    csr_write(CSR_HENVCFG, vcpu->arch.henvcfg);
+    csr_write(CSR_HCOUNTEREN, vcpu->arch.hcounteren);
+    csr_write(CSR_HTIMEDELTA, vcpu->arch.htimedelta);
+    csr_write(CSR_HTVAL, vcpu->arch.htval);
+    csr_write(CSR_HTINST, vcpu->arch.htinst);
+#ifdef CONFIG_32BIT
+    csr_write(CSR_HENVCFGH, vcpu->arch.henvcfgh);
+    csr_write(CSR_HTIMEDELTAH, vcpu->arch.htimedeltah);
+#endif
 
-    /* Enable all timers for guest */
-    csr_write(CSR_HCOUNTEREN, -1UL);
-
-    /* Enable floating point and other extensions for guest. */
-    /* TODO Disable them in Xen. */
-    csr_clear(CSR_SSTATUS, SSTATUS_FS | SSTATUS_XS);
-    csr_set(CSR_SSTATUS, SSTATUS_FS_INITIAL | SSTATUS_XS_INITIAL);
+    csr_write(CSR_VSSTATUS, vcpu->arch.vsstatus);
+    csr_write(CSR_VSIP, vcpu->arch.vsip);
+    csr_write(CSR_VSIE, vcpu->arch.vsie);
+    csr_write(CSR_VSTVEC, vcpu->arch.vstvec);
+    csr_write(CSR_VSSCRATCH, vcpu->arch.vsscratch);
+    csr_write(CSR_VSCAUSE, vcpu->arch.vscause);
+    csr_write(CSR_VSTVAL, vcpu->arch.vstval);
+    csr_write(CSR_VSATP, vcpu->arch.vsatp);
 }
 
 void context_switch(struct vcpu *prev, struct vcpu *next)
 {
+    ASSERT(prev != next);
+
     local_irq_disable();
     set_current(next);
 
-    context_switch_to_guest(next);
+    p2m_save_state(prev);
+    p2m_restore_state(next);
 
-    /* TODO Handle CSRs, floating point registers */
+    context_save_csrs(prev);
+    context_restore_csrs(next);
+
+    /* TODO Handle floating point registers */
     prev = __context_switch(prev, next);
 
-    ASSERT(prev != current);
 
     local_irq_enable();
     sched_context_switched(prev, current);
@@ -250,6 +283,37 @@ static void continue_new_vcpu(void)
     reset_stack_and_jump(return_to_new_vcpu64);
 }
 
+static void vcpu_csr_init(struct vcpu *v)
+{
+    unsigned long hedeleg, hstatus;
+
+    hedeleg = 0;
+    hedeleg |= (1U << CAUSE_MISALIGNED_FETCH);
+    hedeleg |= (1U << CAUSE_FETCH_ACCESS);
+    hedeleg |= (1U << CAUSE_ILLEGAL_INSTRUCTION);
+    hedeleg |= (1U << CAUSE_MISALIGNED_LOAD);
+    hedeleg |= (1U << CAUSE_LOAD_ACCESS);
+    hedeleg |= (1U << CAUSE_MISALIGNED_STORE);
+    hedeleg |= (1U << CAUSE_STORE_ACCESS);
+    hedeleg |= (1U << CAUSE_BREAKPOINT);
+    hedeleg |= (1U << CAUSE_USER_ECALL);
+    hedeleg |= (1U << CAUSE_FETCH_PAGE_FAULT);
+    hedeleg |= (1U << CAUSE_LOAD_PAGE_FAULT);
+    hedeleg |= (1U << CAUSE_STORE_PAGE_FAULT);
+    v->arch.hedeleg = hedeleg;
+
+    hstatus = HSTATUS_SPV | HSTATUS_SPVP;
+    v->arch.hstatus = hstatus;
+
+    /* Enable all timers for guest */
+    v->arch.hcounteren = -1UL;
+
+    /* Enable floating point and other extensions for guest. */
+    /* TODO Disable them in Xen. */
+    csr_clear(CSR_SSTATUS, SSTATUS_FS | SSTATUS_XS);
+    csr_set(CSR_SSTATUS, SSTATUS_FS_INITIAL | SSTATUS_XS_INITIAL);
+}
+
 int arch_vcpu_create(struct vcpu *v)
 {
     BUILD_BUG_ON( sizeof(struct cpu_info) > STACK_SIZE );
@@ -278,6 +342,8 @@ int arch_vcpu_create(struct vcpu *v)
         free_xenheap_pages(v->arch.stack, STACK_ORDER);
         return -ENOMEM;
     }
+
+    vcpu_csr_init(v);
 
     return 0;
 }

@@ -53,7 +53,8 @@ struct arch_domain
 struct arch_vcpu
 {
     /* Callee-saved registers and tp, gp, ra */
-    struct {
+    struct
+    {
         register_t s0;
         register_t s1;
         register_t s2;
@@ -77,6 +78,34 @@ struct arch_vcpu
     struct cpu_info *cpu_info;
     void *stack;
     struct vplic *vplic;
+
+    /* CSRs */
+    register_t hstatus;
+    register_t hedeleg;
+    register_t hideleg;
+    register_t hvip;
+    register_t hip;
+    register_t hie;
+    register_t hgeie;
+    register_t henvcfg;
+    register_t hcounteren;
+    register_t htimedelta;
+    register_t htval;
+    register_t htinst;
+#ifdef CONFIG_32BIT
+    register_t henvcfgh;
+    register_t htimedeltah;
+#endif
+    /* VCSRs */
+    register_t vsstatus;
+    register_t vsip;
+    register_t vsie;
+    register_t vstvec;
+    register_t vsscratch;
+    register_t vscause;
+    register_t vstval;
+    register_t vsatp;
+
 }  __cacheline_aligned;
 
 void vcpu_show_execution_state(struct vcpu *);
