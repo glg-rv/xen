@@ -90,15 +90,11 @@ unsigned long riscv_vcpu_unpriv_read(struct vcpu *vcpu,
 	register unsigned long tmp asm("t1");
 	register unsigned long addr asm("t2") = guest_addr;
 	unsigned long flags;
-	unsigned long old_stvec, old_hstatus = 0;
+	unsigned long old_stvec, old_hstatus;
 
 	local_irq_save(flags);
 
-        /* Current HSTATUS is always corresponding to current vcpu. */
-        if ( vcpu != current )
-        {
-            old_hstatus = csr_swap(CSR_HSTATUS, vcpu->arch.hstatus);
-        }
+        old_hstatus = csr_swap(CSR_HSTATUS, vcpu->arch.hstatus);
 	old_stvec = csr_swap(CSR_STVEC, (unsigned long)&__riscv_unpriv_trap);
 
 	if (read_insn) {
@@ -169,10 +165,7 @@ unsigned long riscv_vcpu_unpriv_read(struct vcpu *vcpu,
 		: [addr] "r" (addr) : "memory");
 	}
 
-        if ( vcpu != current )
-        {
-            csr_write(CSR_HSTATUS, old_hstatus);
-        }
+        csr_write(CSR_HSTATUS, old_hstatus);
 	csr_write(CSR_STVEC, old_stvec);
 
 	local_irq_restore(flags);

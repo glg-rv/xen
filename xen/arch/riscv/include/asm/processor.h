@@ -62,15 +62,17 @@
 #define RISCV_CPU_USER_REGS_t6		    31
 #define RISCV_CPU_USER_REGS_sepc       	    32
 #define RISCV_CPU_USER_REGS_sstatus    	    33
-#define RISCV_CPU_USER_REGS_last	    34
+#define RISCV_CPU_USER_REGS_pregs    	    34
+#define RISCV_CPU_USER_REGS_last	    35
 
 #define RISCV_CPU_USER_REGS_OFFSET(x)	((RISCV_CPU_USER_REGS_##x) * __SIZEOF_POINTER__)
 #define RISCV_CPU_USER_REGS_SIZE		RISCV_CPU_USER_REGS_OFFSET(last)
 
 #define RISCV_PCPUINFO_processor_id     0
-#define RISCV_PCPUINFO_cpu_info         1
-#define RISCV_PCPUINFO_tmp              2
-#define RISCV_PCPUINFO_last             3
+#define RISCV_PCPUINFO_guest_cpu_info   1
+#define RISCV_PCPUINFO_stack_cpu_regs   2
+#define RISCV_PCPUINFO_tmp              3
+#define RISCV_PCPUINFO_last             4
 #define RISCV_PCPUINFO_OFFSET(x)	((RISCV_PCPUINFO_##x) * __SIZEOF_POINTER__)
 #define RISCV_PCPUINFO_SIZE		    RISCV_PCPUINFO_OFFSET(last)
 
@@ -80,7 +82,10 @@ register struct pcpu_info *tp asm ("tp");
 
 struct pcpu_info {
     unsigned long processor_id;
-    struct cpu_info *cpu_info;
+    /* cpu_info of the guest. Always on the top of the stack. */
+    struct cpu_info *guest_cpu_info;
+    /* CPU registers of the current trap. Differ from guest_cpu_info if trapped from xen. */
+    struct cpu_user_regs *stack_cpu_regs;
 
     /* temporary variable to be used during save/restore of vcpu regs */
     unsigned long tmp;
@@ -131,6 +136,8 @@ struct cpu_user_regs
     register_t t6;
     register_t sepc;
     register_t sstatus;
+    /* pointer to previous stack_cpu_regs */
+    register_t pregs;
 };
 
 void show_execution_state(const struct cpu_user_regs *regs);

@@ -27,6 +27,7 @@ save_to_stack:
     /* Save context to stack */
     REG_S   sp, (RISCV_CPU_USER_REGS_OFFSET(sp) - RISCV_CPU_USER_REGS_SIZE) (sp)
     addi    sp, sp, -RISCV_CPU_USER_REGS_SIZE
+    REG_S   t0, RISCV_CPU_USER_REGS_OFFSET(t0)(sp)
     j       save_context
 
     /* Exceptions from guest */
@@ -34,10 +35,11 @@ save_to_cpuinfo:
     /* tp->tmp = sp */
     REG_S   sp, RISCV_PCPUINFO_OFFSET(tmp)(tp)
 
-    /* sp = ((struct pcpu_info*)tp)->cpu_info */
-    REG_L   sp, RISCV_PCPUINFO_OFFSET(cpu_info)(tp)
+    /* sp = ((struct pcpu_info*)tp)->guest_cpu_info */
+    REG_L   sp, RISCV_PCPUINFO_OFFSET(guest_cpu_info)(tp)
 
-    /* sp->cpu_info->sp = tp->tmp */
+    /* sp->guest_cpu_info->sp = tp->tmp */
+    REG_S   t0, RISCV_CPU_USER_REGS_OFFSET(t0)(sp)
     REG_L   t0, RISCV_PCPUINFO_OFFSET(tmp)(tp)
     REG_S   t0, RISCV_CPU_USER_REGS_OFFSET(sp)(sp)
 
@@ -45,7 +47,6 @@ save_context:
     /* Save registers */
     REG_S   ra, RISCV_CPU_USER_REGS_OFFSET(ra)(sp)
     REG_S   gp, RISCV_CPU_USER_REGS_OFFSET(gp)(sp)
-    REG_S   t0, RISCV_CPU_USER_REGS_OFFSET(t0)(sp)
     REG_S   t1, RISCV_CPU_USER_REGS_OFFSET(t1)(sp)
     REG_S   t2, RISCV_CPU_USER_REGS_OFFSET(t2)(sp)
     REG_S   s0, RISCV_CPU_USER_REGS_OFFSET(s0)(sp)
@@ -77,29 +78,36 @@ save_context:
     csrr    t0, CSR_SSTATUS
     REG_S   t0, RISCV_CPU_USER_REGS_OFFSET(sstatus)(sp)
 
-    /* Save guest tp. Set sscratch to non-zero */
+    /* Save guest/xen tp. Set sscratch to zero */
     csrrw   tp, CSR_SSCRATCH, tp
     REG_S   tp, RISCV_CPU_USER_REGS_OFFSET(tp)(sp)
-    li      t1, 1
-    mv      t2, tp
-    csrrw   tp, CSR_SSCRATCH, t1
-    bnez    tp, finish_save_context
-    /* tp == 0 */
-    mv      tp, t2
-    /* Set sscratch zero if trapped from xen */
-    csrw    CSR_SSCRATCH, zero
+    mv      t0, tp
+    csrrw   tp, CSR_SSCRATCH, zero
+    bnez    tp, continue_save_context
+    /* if tp == 0 */
+    mv      tp, t0
 
-finish_save_context:
+continue_save_context:
+    /* new_stack_cpu_regs.pregs = old_stack_cpu_res */
+    REG_L   t0, RISCV_PCPUINFO_OFFSET(stack_cpu_regs)(tp)
+    REG_S   t0, RISCV_CPU_USER_REGS_OFFSET(pregs)(sp)
+    /* Update stack_cpu_regs */
+    REG_S   sp, RISCV_PCPUINFO_OFFSET(stack_cpu_regs)(tp)
+    
     jal __handle_exception
 
     /* Save tp */
     csrw    CSR_SSCRATCH, tp
 
-restore_registers:
+    /* Restore stack_cpu_regs */
+    REG_L   t0, RISCV_CPU_USER_REGS_OFFSET(pregs)(sp)
+    REG_S   t0, RISCV_PCPUINFO_OFFSET(stack_cpu_regs)(tp)
+
     REG_L   t0, RISCV_CPU_USER_REGS_OFFSET(sepc)(sp)
     csrw    CSR_SEPC, t0
     REG_L   t0, RISCV_CPU_USER_REGS_OFFSET(sstatus)(sp)
     csrw    CSR_SSTATUS, t0
+
     REG_L   ra, RISCV_CPU_USER_REGS_OFFSET(ra)(sp)
     REG_L   gp, RISCV_CPU_USER_REGS_OFFSET(gp)(sp)
     REG_L   t0, RISCV_CPU_USER_REGS_OFFSET(t0)(sp)
@@ -143,8 +151,10 @@ _hang:
 
 /* t0 is used as a temporary reg and is clobbered to oblivion */
 ENTRY(return_to_new_vcpu64)
+    jal     leave_hypervisor_to_guest
+    
     /* Store stack pointer to tp->vcpu->arch.guest_cpu_user_regs.sp */
-    REG_S   sp, RISCV_PCPUINFO_OFFSET(cpu_info)(tp)
+    REG_S   sp, RISCV_PCPUINFO_OFFSET(guest_cpu_info)(tp)
 
     /* Backup tp into sscratch */
     csrrw    tp, CSR_SSCRATCH, tp
@@ -153,7 +163,7 @@ ENTRY(return_to_new_vcpu64)
     REG_L   t0, RISCV_CPU_USER_REGS_OFFSET(sepc)(sp)
     csrw    sepc, t0
 
-    /* Hartid goes to 10 */
+    /* Hartid goes to a0 */
     REG_L   a0, RISCV_CPU_USER_REGS_OFFSET(a0)(sp)
 
     /* DTB goes to a1 */

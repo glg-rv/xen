@@ -49,7 +49,7 @@ void p2m_restore_state(struct vcpu *n)
     if ( is_idle_vcpu(n) )
         return;
 
-    csr_write(CSR_HGATP, p2m->hgatp);
+    n->arch.hgatp = p2m->hgatp;
 }
 
 mfn_t gfn_to_mfn(struct domain *d, gfn_t gfn)

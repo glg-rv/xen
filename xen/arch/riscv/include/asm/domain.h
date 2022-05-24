@@ -91,6 +91,7 @@ struct arch_vcpu
     register_t htimedelta;
     register_t htval;
     register_t htinst;
+    register_t hgatp;
 #ifdef CONFIG_32BIT
     register_t henvcfgh;
     register_t htimedeltah;

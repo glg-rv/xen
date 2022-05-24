@@ -5,6 +5,7 @@
 #include <xen/domain.h>
 #include <xen/softirq.h>
 #include <asm/vtimer.h>
+#include <asm/traps.h>
 #include <public/domctl.h>
 #include <public/xen.h>
 
@@ -13,64 +14,6 @@ DEFINE_PER_CPU(struct vcpu *, curr_vcpu);
 struct vcpu *alloc_dom0_vcpu0(struct domain *dom0)
 {
     return vcpu_create(dom0, 0);
-}
-
-static void context_save_csrs(struct vcpu *vcpu)
-{
-    vcpu->arch.hstatus = csr_read(CSR_HSTATUS);
-    vcpu->arch.hedeleg = csr_read(CSR_HEDELEG);
-    vcpu->arch.hideleg = csr_read(CSR_HIDELEG);
-    vcpu->arch.hvip = csr_read(CSR_HVIP);
-    vcpu->arch.hip = csr_read(CSR_HIP);
-    vcpu->arch.hie = csr_read(CSR_HIE);
-    vcpu->arch.hgeie = csr_read(CSR_HGEIE);
-    vcpu->arch.henvcfg = csr_read(CSR_HENVCFG);
-    vcpu->arch.hcounteren = csr_read(CSR_HCOUNTEREN);
-    vcpu->arch.htimedelta = csr_read(CSR_HTIMEDELTA);
-    vcpu->arch.htval = csr_read(CSR_HTVAL);
-    vcpu->arch.htinst = csr_read(CSR_HTINST);
-#ifdef CONFIG_32BIT
-    vcpu->arch.henvcfgh = csr_read(CSR_HENVCFGH);
-    vcpu->arch.htimedeltah = csr_read(CSR_HTIMEDELTAH);
-#endif
-
-    vcpu->arch.vsstatus = csr_read(CSR_VSSTATUS);
-    vcpu->arch.vsip = csr_read(CSR_VSIP);
-    vcpu->arch.vsie = csr_read(CSR_VSIE);
-    vcpu->arch.vstvec = csr_read(CSR_VSTVEC);
-    vcpu->arch.vsscratch = csr_read(CSR_VSSCRATCH);
-    vcpu->arch.vscause = csr_read(CSR_VSCAUSE);
-    vcpu->arch.vstval = csr_read(CSR_VSTVAL);
-    vcpu->arch.vsatp = csr_read(CSR_VSATP);
-}
-
-static void context_restore_csrs(struct vcpu *vcpu)
-{
-    csr_write(CSR_HSTATUS, vcpu->arch.hstatus);
-    csr_write(CSR_HEDELEG, vcpu->arch.hedeleg);
-    csr_write(CSR_HIDELEG, vcpu->arch.hideleg);
-    csr_write(CSR_HVIP, vcpu->arch.hvip);
-    csr_write(CSR_HIP, vcpu->arch.hip);
-    csr_write(CSR_HIE, vcpu->arch.hie);
-    csr_write(CSR_HGEIE, vcpu->arch.hgeie);
-    csr_write(CSR_HENVCFG, vcpu->arch.henvcfg);
-    csr_write(CSR_HCOUNTEREN, vcpu->arch.hcounteren);
-    csr_write(CSR_HTIMEDELTA, vcpu->arch.htimedelta);
-    csr_write(CSR_HTVAL, vcpu->arch.htval);
-    csr_write(CSR_HTINST, vcpu->arch.htinst);
-#ifdef CONFIG_32BIT
-    csr_write(CSR_HENVCFGH, vcpu->arch.henvcfgh);
-    csr_write(CSR_HTIMEDELTAH, vcpu->arch.htimedeltah);
-#endif
-
-    csr_write(CSR_VSSTATUS, vcpu->arch.vsstatus);
-    csr_write(CSR_VSIP, vcpu->arch.vsip);
-    csr_write(CSR_VSIE, vcpu->arch.vsie);
-    csr_write(CSR_VSTVEC, vcpu->arch.vstvec);
-    csr_write(CSR_VSSCRATCH, vcpu->arch.vsscratch);
-    csr_write(CSR_VSCAUSE, vcpu->arch.vscause);
-    csr_write(CSR_VSTVAL, vcpu->arch.vstval);
-    csr_write(CSR_VSATP, vcpu->arch.vsatp);
 }
 
 void context_switch(struct vcpu *prev, struct vcpu *next)
@@ -86,10 +29,11 @@ void context_switch(struct vcpu *prev, struct vcpu *next)
     vtimer_save(prev);
     vtimer_restore(next);
 
-    context_save_csrs(prev);
-    context_restore_csrs(next);
+    ASSERT(is_idle_vcpu(prev) || trap_from_guest);
+    tp->guest_cpu_info = next->arch.cpu_info;
+    tp->stack_cpu_regs = &next->arch.cpu_info->guest_cpu_user_regs;
 
-    tp->cpu_info = next->arch.cpu_info;
+    /* __handle_exception handles CSRs */
 
     /* TODO Handle floating point registers */
     prev = __context_switch(prev, next);
@@ -99,7 +43,23 @@ void context_switch(struct vcpu *prev, struct vcpu *next)
     sched_context_switched(prev, current);
 }
 
+static void do_idle(void)
+{
+    unsigned int cpu = smp_processor_id();
 
+    rcu_idle_enter(cpu);
+    /* rcu_idle_enter() can raise TIMER_SOFTIRQ. Process it now. */
+    process_pending_softirqs();
+
+    local_irq_disable();
+    if ( cpu_is_haltable(cpu) )
+    {
+        wait_for_interrupt();
+    }
+    local_irq_enable();
+
+    rcu_idle_exit(cpu);
+}
 
 void idle_loop(void)
 {
@@ -111,6 +71,10 @@ void idle_loop(void)
     {
         if ( unlikely(tasklet_work_to_do(cpu)) )
             do_tasklet();
+        else if ( !softirq_pending(cpu) && !scrub_free_pages() &&
+                  !softirq_pending(cpu) )
+            do_idle();
+
         do_softirq();
     }
 }

@@ -15,9 +15,8 @@ DECLARE_PER_CPU(struct vcpu *, curr_vcpu);
 
 /* Per-VCPU state that lives at the top of the stack */
 struct cpu_info {
+    /* This should be the first member. */
     struct cpu_user_regs guest_cpu_user_regs;
-    unsigned long elr;
-    uint32_t flags;
 };
 
 static inline struct cpu_info *get_cpu_info(void)
