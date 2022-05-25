@@ -268,7 +268,7 @@ static void continue_new_vcpu(void)
 
 static void vcpu_csr_init(struct vcpu *v)
 {
-    unsigned long hedeleg, hstatus;
+    unsigned long hedeleg, hideleg, hstatus;
 
     hedeleg = 0;
     hedeleg |= (1U << CAUSE_MISALIGNED_FETCH);
@@ -287,6 +287,9 @@ static void vcpu_csr_init(struct vcpu *v)
 
     hstatus = HSTATUS_SPV | HSTATUS_SPVP;
     v->arch.hstatus = hstatus;
+
+    hideleg = MIP_VSTIP;
+    v->arch.hideleg = hideleg;
 
     /* Enable all timers for guest */
     v->arch.hcounteren = -1UL;
