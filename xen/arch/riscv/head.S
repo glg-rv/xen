@@ -5,11 +5,8 @@
 #include <asm/config.h>
 #include <asm/processor.h>
 
-.global _start
-
+	.section .text.header, "ax", %progbits
 ENTRY(start)
-	.section .entry, "ax", %progbits
-_start:
 	/* Mask all interrupts */
 	csrw CSR_SIE, zero
 
@@ -219,5 +216,4 @@ _cpu_init:
 
 	/* Hang !!! */
 	j	_start_hang
-
-	ret
+ENDPROC(start)

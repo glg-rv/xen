@@ -143,7 +143,8 @@ int arch_sanitise_domain_config(struct xen_domctl_createdomain *config)
 
 
 int arch_domain_create(struct domain *d,
-                       struct xen_domctl_createdomain *config)
+                       struct xen_domctl_createdomain *config,
+                        unsigned int flags)
 {
     int rc = 0;
 

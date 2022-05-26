@@ -5,7 +5,7 @@
 #include <xen/param.h>
 #include <xen/warning.h>
 #include <xen/libfdt/libfdt.h>
-#include <asm-riscv/acpi.h>
+#include <asm/acpi.h>
 
 static u64 __initdata dom0_mem;
 static bool __initdata dom0_mem_set;

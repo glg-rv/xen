@@ -74,6 +74,7 @@ extern void init_timer_interrupt(void);
 
 extern void timer_interrupt(unsigned long cause, struct cpu_user_regs *regs);
 
+extern void force_update_vcpu_system_time(struct vcpu *v);
 
 extern uint64_t boot_count;
 

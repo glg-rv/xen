@@ -275,7 +275,7 @@ int arch_acquire_resource(struct domain *d, unsigned int type, unsigned int id,
  * On RISC-V, all the RAM is currently direct mapped in Xen.
  * Hence return always true.
  */
-static inline bool arch_mfn_in_directmap(unsigned long mfn)
+static inline bool arch_mfns_in_directmap(unsigned long mfn, unsigned long nr)
 {
     return true;
 }

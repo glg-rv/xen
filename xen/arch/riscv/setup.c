@@ -153,6 +153,18 @@ static void __init init_pdx(void)
     }
 }
 
+static void generic_swap(void *a, void *b, size_t size)
+{
+    char t;
+
+    do {
+        t = *(char *)a;
+        *(char *)a++ = *(char *)b;
+        *(char *)b++ = t;
+    } while ( --size > 0 );
+}
+
+
 static void __init setup_memory_region(paddr_t bank_start, paddr_t bank_end)
 {
     paddr_t bank_size = bank_end - bank_start;
@@ -210,7 +222,7 @@ static void __init setup_mm(void)
      * the banks sorted in ascending order. So sort them through.
      */
     sort(bootinfo.mem.bank, bootinfo.mem.nr_banks, sizeof(struct membank),
-         cmp_memory_node, NULL);
+         cmp_memory_node, generic_swap);
 
     init_pdx();
 

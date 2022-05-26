@@ -108,6 +108,10 @@ struct arch_vcpu
 
 }  __cacheline_aligned;
 
+struct arch_vcpu_io {
+    /* TODO */
+};
+
 void vcpu_show_execution_state(struct vcpu *);
 void vcpu_show_registers(const struct vcpu *);
 

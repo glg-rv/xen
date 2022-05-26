@@ -50,6 +50,7 @@ SECTIONS
   {
     PROVIDE(_text_start = .);
     _stext = .;            /* Text section */
+    *(.text.header)
     *(.entry)
     *(.text)
     . = ALIGN(8);
