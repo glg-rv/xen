@@ -94,11 +94,14 @@ continue_save_context:
     /* Update stack_cpu_regs */
     REG_S   sp, RISCV_PCPUINFO_OFFSET(stack_cpu_regs)(tp)
     
-    jal __handle_exception
+    jal     __handle_exception
 
-    /* Save tp */
+    /* if trapped from guest, save tp */
+    jal     __trap_from_guest
+    beqz    a0, restore_registers
     csrw    CSR_SSCRATCH, tp
 
+restore_registers:
     /* Restore stack_cpu_regs */
     REG_L   t0, RISCV_CPU_USER_REGS_OFFSET(pregs)(sp)
     REG_S   t0, RISCV_PCPUINFO_OFFSET(stack_cpu_regs)(tp)

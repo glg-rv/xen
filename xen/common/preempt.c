@@ -33,6 +33,11 @@ bool_t in_atomic(void)
 #ifndef NDEBUG
 void ASSERT_NOT_IN_ATOMIC(void)
 {
+    if (preempt_count())
+    {
+        printk("IN_ATOMIC\n");
+        for (;;);
+    }
     ASSERT(!preempt_count());
     ASSERT(!in_irq());
     ASSERT(local_irq_is_enabled());

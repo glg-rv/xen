@@ -3,9 +3,6 @@
 
 #ifndef __ASSEMBLY__
 
-#include <asm/processor.h>
-#include <asm/current.h>
-
 void __handle_exception(void);
 void handle_exception(void);
 
@@ -17,11 +14,8 @@ struct riscv_trap {
     unsigned long htinst;
 };
 
-static inline unsigned long __trap_from_guest(void)
-{
-    return tp->stack_cpu_regs == &tp->guest_cpu_info->guest_cpu_user_regs;
-}
-/* Make trap_from_guest read-only */
+extern unsigned long __trap_from_guest(void);
+
 #define trap_from_guest __trap_from_guest()
 
 #endif /* __ASSEMBLY__ */

@@ -49,6 +49,11 @@
         printk("\t" #_csr ": 0x%02lx\n", csr_read(_csr)); \
     } while ( 0 )
 
+unsigned long __trap_from_guest(void)
+{
+    return tp->stack_cpu_regs == &tp->guest_cpu_info->guest_cpu_user_regs;
+}
+
 static inline void advance_pc(struct cpu_user_regs *regs)
 {
     regs->sepc += 4;
@@ -519,6 +524,8 @@ void enter_hypervisor_from_guest(void)
 
 static void stay_in_hypervisor(void)
 {
+    local_irq_disable();
+
     /* Unset SPV in hstatus */
     csr_clear(CSR_HSTATUS, HSTATUS_SPV);
 }
