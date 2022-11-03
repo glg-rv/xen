@@ -240,7 +240,7 @@ int guest_physmap_remove_page(struct domain *d, gfn_t gfn, mfn_t mfn,
 struct page_info *p2m_get_page_from_gfn(struct domain *d, gfn_t gfn,
                                         p2m_type_t *t)
 {
-    p2m_type_t p2mt;
+    p2m_type_t p2mt = {0};
     mfn_t mfn = p2m_lookup(d, gfn, &p2mt);
 
     if ( t )
