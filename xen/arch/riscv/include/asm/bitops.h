@@ -16,37 +16,28 @@
 
 #include <asm/system.h>
 
-#define BITS_PER_WORD           32
-#define BIT_ULL(nr)		(1ULL << (nr))
-#define BIT_MASK(nr)		(1UL << ((nr) % BITS_PER_LONG))
-#define BIT_WORD(nr)		((nr) / BITS_PER_LONG)
-#define BIT_ULL_MASK(nr)	(1ULL << ((nr) % BITS_PER_LONG_LONG))
-#define BIT_ULL_WORD(nr)	((nr) / BITS_PER_LONG_LONG)
-#define BITS_PER_BYTE		8
+#define BITOP_BITS_PER_WORD     32
+#define BITOP_MASK(nr)	        (1UL << ((nr) % BITOP_BITS_PER_WORD))
+#define BITOP_WORD(nr)	        ((nr) / BITOP_BITS_PER_WORD)
+#define BITS_PER_BYTE	        8
 
-#define __set_bit(n,p)            set_bit(n,p)
-#define __clear_bit(n,p)          clear_bit(n,p)
+#define __set_bit(n,p)          set_bit(n,p)
+#define __clear_bit(n,p)        clear_bit(n,p)
 
 #ifndef smp_mb__before_clear_bit
 #define smp_mb__before_clear_bit()  smp_mb()
 #define smp_mb__after_clear_bit()   smp_mb()
 #endif /* smp_mb__before_clear_bit */
 
-#if (BITS_PER_LONG == 64)
-#define __AMO(op)	"amo" #op ".d"
-#elif (BITS_PER_LONG == 32)
 #define __AMO(op)	"amo" #op ".w"
-#else
-#error "Unexpected BITS_PER_LONG"
-#endif
 
 #define __test_and_op_bit_ord(op, mod, nr, addr, ord)		\
 ({								\
 	unsigned long __res, __mask;				\
-	__mask = BIT_MASK(nr);					\
+	__mask = BITOP_MASK(nr);					\
 	__asm__ __volatile__ (					\
 		__AMO(op) #ord " %0, %2, %1"			\
-		: "=r" (__res), "+A" (addr[BIT_WORD(nr)])	\
+		: "=r" (__res), "+A" (addr[BITOP_WORD(nr)])	\
 		: "r" (mod(__mask))				\
 		: "memory");					\
 	((__res & __mask) != 0);				\
@@ -55,8 +46,8 @@
 #define __op_bit_ord(op, mod, nr, addr, ord)			\
 	__asm__ __volatile__ (					\
 		__AMO(op) #ord " zero, %1, %0"			\
-		: "+A" (addr[BIT_WORD(nr)])			\
-		: "r" (mod(BIT_MASK(nr)))			\
+		: "+A" (addr[BITOP_WORD(nr)])			\
+		: "r" (mod(BITOP_MASK(nr)))			\
 		: "memory");
 
 #define __test_and_op_bit(op, mod, nr, addr) 			\
@@ -77,7 +68,7 @@
  */
 static inline int __test_and_set_bit(int nr, volatile void *p)
 {
-	volatile unsigned long *addr = p;
+	volatile uint32_t *addr = p;
 
 	return __test_and_op_bit(or, __NOP, nr, addr);
 }
@@ -91,7 +82,7 @@ static inline int __test_and_set_bit(int nr, volatile void *p)
  */
 static inline int __test_and_clear_bit(int nr, volatile void *p)
 {
-	volatile unsigned long *addr = p;
+	volatile uint32_t *addr = p;
 
 	return __test_and_op_bit(and, __NOT, nr, addr);
 }
@@ -106,7 +97,7 @@ static inline int __test_and_clear_bit(int nr, volatile void *p)
  */
 static inline int __test_and_change_bit(int nr, volatile void *p)
 {
-	volatile unsigned long *addr = p;
+	volatile uint32_t *addr = p;
 
 	return __test_and_op_bit(xor, __NOP, nr, addr);
 }
@@ -125,7 +116,7 @@ static inline int __test_and_change_bit(int nr, volatile void *p)
  */
 static inline void set_bit(int nr, volatile void *p)
 {
-	volatile unsigned long *addr = p;
+	volatile uint32_t *addr = p;
 
 	__op_bit(or, __NOP, nr, addr);
 }
@@ -141,16 +132,16 @@ static inline void set_bit(int nr, volatile void *p)
  */
 static inline void clear_bit(int nr, volatile void *p)
 {
-	volatile unsigned long *addr = p;
+	volatile uint32_t *addr = p;
 
 	__op_bit(and, __NOT, nr, addr);
 }
 
 static inline int test_bit(int nr, const volatile void *p)
 {
-	const volatile unsigned long *addr = (const volatile unsigned long *)p;
+	const volatile uint32_t *addr = (const volatile uint32_t *)p;
 
-	return 1UL & (addr[BIT_WORD(nr)] >> (nr & (BITS_PER_LONG-1)));
+	return 1UL & (addr[BITOP_WORD(nr)] >> (nr & (BITOP_BITS_PER_WORD-1)));
 }
 
 /**
@@ -164,7 +155,7 @@ static inline int test_bit(int nr, const volatile void *p)
  */
 static inline void change_bit(int nr, volatile void *p)
 {
-	volatile unsigned long *addr = p;
+	volatile uint32_t *addr = p;
 
 	__op_bit(xor, __NOP, nr, addr);
 }
@@ -180,7 +171,7 @@ static inline void change_bit(int nr, volatile void *p)
 static inline int test_and_set_bit_lock(
 	unsigned long nr, volatile void *p)
 {
-	volatile unsigned long *addr = p;
+	volatile uint32_t *addr = p;
 
 	return __test_and_op_bit_ord(or, __NOP, nr, addr, .aq);
 }
@@ -195,7 +186,7 @@ static inline int test_and_set_bit_lock(
 static inline void clear_bit_unlock(
 	unsigned long nr, volatile void *p)
 {
-	volatile unsigned long *addr = p;
+	volatile uint32_t *addr = p;
 
 	__op_bit_ord(and, __NOT, nr, addr, .rl);
 }
