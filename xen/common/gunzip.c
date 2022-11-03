@@ -98,6 +98,8 @@ __init int gzip_check(char *image, unsigned long image_len)
     magic0 = (unsigned char)image[0];
     magic1 = (unsigned char)image[1];
 
+    printk("magic0: %x, magic1: %x\n", magic0, magic1);
+
     return (magic0 == 0x1f) && ((magic1 == 0x8b) || (magic1 == 0x9e));
 }
 

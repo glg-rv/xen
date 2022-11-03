@@ -31,6 +31,7 @@
 void __init copy_from_paddr(void *dst, paddr_t paddr, unsigned long len)
 {
     void *src = (void *)FIXMAP_ADDR(FIXMAP_MISC);
+    printk("%s: %p (%ld): src\n", __FUNCTION__, src, len);
 
     while (len) {
         unsigned long l, s;
@@ -39,6 +40,7 @@ void __init copy_from_paddr(void *dst, paddr_t paddr, unsigned long len)
         l = min(PAGE_SIZE - s, len);
 
         set_fixmap(FIXMAP_MISC, maddr_to_mfn(paddr), PAGE_HYPERVISOR_WC);
+        printk("FIXMAP SET %lx -> %lx\n", mfn_x(maddr_to_mfn(paddr)), paddr);
         memcpy(dst, src + s, l);
         clear_fixmap(FIXMAP_MISC);
 
@@ -135,27 +137,31 @@ static __init int kernel_decompress(struct bootmodule *mod)
     if ( size < 2 )
         return -EINVAL;
 
+    printk("%s %s %d here (copy from paddr: %lx)\n", __FILE__, __FUNCTION__, __LINE__, addr);
     copy_from_paddr(magic, addr, sizeof(magic));
-
+    printk("%s %s %d here\n", __FILE__, __FUNCTION__, __LINE__);
     /* only gzip is supported */
     if ( !gzip_check(magic, size) )
         return -EINVAL;
-
+    printk("%s %s %d here\n", __FILE__, __FUNCTION__, __LINE__);
     input = ioremap_cache(addr, size);
     if ( input == NULL )
         return -EFAULT;
-
+    printk("%s %s %d here\n", __FILE__, __FUNCTION__, __LINE__);
     output_size = output_length(input, size);
     kernel_order_out = get_order_from_bytes(output_size);
+    printk("%s %s %d here\n", __FILE__, __FUNCTION__, __LINE__);
     pages = alloc_domheap_pages(NULL, kernel_order_out, 0);
+    printk("%s %s %d here\n", __FILE__, __FUNCTION__, __LINE__);
     if ( pages == NULL )
     {
         iounmap(input);
         return -ENOMEM;
     }
+    printk("%s %s %d here\n", __FILE__, __FUNCTION__, __LINE__);
     mfn = page_to_mfn(pages);
     output = __vmap(&mfn, 1 << kernel_order_out, 1, 1, PAGE_HYPERVISOR, VMAP_DEFAULT);
-
+    printk("%s %s %d here\n", __FILE__, __FUNCTION__, __LINE__);
     rc = perform_gunzip(output, input, size);
     iounmap(input);
     vunmap(output);
@@ -249,13 +255,16 @@ int __init kernel_probe(struct kernel_info *info,
         return -ENOENT;
     }
 
-    printk("TODO: load initrd bootmod\n");
+    printk("mod: %ld (%ld)\n", mod->start, mod->size);
 
+    printk("TODO: load initrd bootmod\n");
+    printk("here before decompression\n");
     /* if it is a gzip'ed image, 32bit or 64bit, uncompress it */
     rc = kernel_decompress(mod);
+    printk("Here after decompression\n");
     if (rc < 0 && rc != -EINVAL)
         return rc;
-
+    printk("here\n");
     return kernel_zimage64_probe(info, mod->start, mod->size);
 }
 

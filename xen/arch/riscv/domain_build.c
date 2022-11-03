@@ -788,7 +788,7 @@ int __init construct_dom0(struct domain *d)
     /* The ordering of operands is to work around a clang5 issue. */
     if ( CONFIG_DOM0_MEM[0] && !dom0_mem_set )
         parse_dom0_mem(CONFIG_DOM0_MEM);
-
+    printk("here");
     if ( dom0_mem <= 0 )
     {
         warning_add("PLEASE SPECIFY dom0_mem PARAMETER - USING 512M FOR NOW\n");
@@ -796,25 +796,26 @@ int __init construct_dom0(struct domain *d)
     }
 
     d->max_pages = dom0_mem >> PAGE_SHIFT;
-
+    printk("here");
     kinfo.unassigned_mem = dom0_mem;
     kinfo.d = d;
-
+    printk("here, too\n");
     rc = kernel_probe(&kinfo, NULL);
     if ( rc < 0 )
         return rc;
-
+    printk("and here, too\n");
     allocate_memory(d, &kinfo);
-
-    if ( acpi_disabled )
+    printk("oh, here, too\n");
+    if ( acpi_disabled ) {
+        printk("hey, here, too\n");
         rc = prepare_dtb_hwdom(d, &kinfo);
-    else
+    } else
         panic("TODO: ACPI\n");
         /* rc = prepare_acpi(d, &kinfo); */
 
     if ( rc < 0 )
         return rc;
-
+    printk("Constructing");
     return construct_domain(d, &kinfo);
 }
 

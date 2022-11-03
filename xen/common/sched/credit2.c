@@ -3108,11 +3108,14 @@ csched2_aff_cntl(const struct scheduler *ops, struct sched_unit *unit,
     if ( !hard )
         return;
 
+    printk("svc->flags = %p (%ld)", &svc->flags, sizeof(svc->flags));
     /* Are we becoming exclusively pinned? */
-    if ( cpumask_weight(hard) == 1 )
+    if ( cpumask_weight(hard) == 1 ) {
+      printk("here");
         __set_bit(__CSFLAG_pinned, &svc->flags);
-    else
+    } else
         __clear_bit(__CSFLAG_pinned, &svc->flags);
+    printk("survived");
 }
 
 static int cf_check csched2_sys_cntl(

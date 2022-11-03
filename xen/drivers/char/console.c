@@ -414,6 +414,7 @@ void console_giveback(int id)
         serial_steal_fn = NULL;
 }
 
+#include <asm/sbi.h>
 void console_serial_puts(const char *s, size_t nr)
 {
     if ( serial_steal_fn != NULL )

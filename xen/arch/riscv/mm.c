@@ -52,6 +52,7 @@
 #include <asm/setup.h>
 #include <xen/libfdt/libfdt.h>
 #include <xen/bootfdt.h>
+#include <asm/early_printk.h>
 
 #define XEN_TABLE_MAP_FAILED 0
 #define XEN_TABLE_SUPER_PAGE 1
@@ -125,6 +126,23 @@ extern unsigned long _rodata_end;
 paddr_t phys_offset;
 unsigned long max_page;
 
+static inline void local_flush_tlb_all_asid(unsigned long asid)
+{
+	__asm__ __volatile__ ("sfence.vma x0, %0"
+			:
+			: "r" (asid)
+			: "memory");
+}
+
+static inline void local_flush_tlb_page_asid(unsigned long addr,
+		unsigned long asid)
+{
+	__asm__ __volatile__ ("sfence.vma %0, %1"
+			:
+			: "r" (addr), "r" (asid)
+			: "memory");
+}
+
 static inline pte_t mfn_to_pte(mfn_t mfn)
 {
     unsigned long pte = mfn_x(mfn) << PTE_SHIFT;
@@ -144,11 +162,23 @@ static inline pte_t mfn_to_xen_entry(mfn_t mfn)
 /* Map a 4k page in a fixmap entry */
 void set_fixmap(unsigned map, mfn_t mfn, unsigned int flags)
 {
+    /*
     pte_t pte;
+    paddr_t maddr;
 
     pte = mfn_to_xen_entry(mfn);
     pte.pte |= PTE_LEAF_DEFAULT;
+    printk("Writing pte %lx\n", pte.pte);
     write_pte(&xen_fixmap[pagetable_zeroeth_index(FIXMAP_ADDR(map))], pte);
+    maddr = pt_walk((paddr_t)&xen_second_pagetable[0], FIXMAP_ADDR(map), true);
+    printk("vaddr: %lx, maddr: %lx\n", FIXMAP_ADDR(map), maddr);
+    local_flush_tlb_all_asid(0);
+    */
+    int res;
+    printk("vaddr: %lx\n", FIXMAP_ADDR(map));
+    res = map_pages_to_xen(FIXMAP_ADDR(map), mfn, 1, flags);
+    BUG_ON(res != 0);
+
 }
 
 /* Remove a mapping from a fixmap entry */
@@ -156,6 +186,7 @@ void clear_fixmap(unsigned map)
 {
     pte_t pte = {0};
     write_pte(&xen_fixmap[pagetable_zeroeth_index(FIXMAP_ADDR(map))], pte);
+    local_flush_tlb_all_asid(0);
 }
 
 #ifdef CONFIG_DOMAIN_PAGE
@@ -247,7 +278,7 @@ int map_pages_to_xen(unsigned long virt, mfn_t mfn, unsigned long nr_mfns,
      * partially modified the PT. This will prevent any unexpected
      * behavior afterwards.
      */
-    asm volatile("sfence.vma");
+    local_flush_tlb_all_asid(0);
     spin_unlock(&xen_pt_lock);
 
     return rc;
@@ -495,14 +526,16 @@ void setup_fixmap_mappings(void)
     second = &xen_second_pagetable[pagetable_second_index(FIXMAP_ADDR(0))];
 
     BUG_ON( !pte_is_valid(second) );
+    early_printk("second pte: %lx\n", second->pte);
 
     first = (pte_t*)pte_to_paddr(second);
     first = &first[pagetable_first_index(FIXMAP_ADDR(0))];
 
+    early_printk("first: %p, pte: %lx\n", first, first->pte);
     if ( !pte_is_valid(first) ) {
         pte = virt_to_pte(&xen_fixmap);
         pte.pte |= PTE_TABLE;
-
+        early_printk("new_pte: %lx\n", pte.pte);
         write_pte(first, pte);
     }
 
@@ -606,7 +639,7 @@ void __init setup_xenheap_mappings(unsigned long base_mfn,
         vaddr += FIRST_SIZE;
     }
 
-    asm volatile("sfence.vma");
+    local_flush_tlb_all_asid(0);
 }
 
 #define resolve_early_addr(x) \
@@ -660,15 +693,15 @@ void * __init early_fdt_map(paddr_t fdt_paddr)
                         base_paddr + SZ_2M, SZ_2M >> PAGE_SHIFT);
     }
 
-    asm volatile("sfence.vma");
+    local_flush_tlb_all_asid(0);
 
     return fdt_virt;
 }
 
-void __init clear_pagetables(unsigned long load_addr_start,
-                             unsigned long load_addr_end,
-                             unsigned long linker_addr_start,
-                             unsigned long linker_addr_end)
+void __init clear_pagetables(unsigned long linker_addr_start,
+                             unsigned long linker_addr_end,
+                             unsigned long load_addr_start,
+                             unsigned long load_addr_end)
 {
     unsigned long *p;
     unsigned long page;
@@ -707,6 +740,7 @@ setup_initial_pagetables(pte_t *second, pte_t *first, pte_t *zeroeth,
     unsigned long index1;
     unsigned long index0;
 
+    early_printk("Mapping PA %lx to VA %lx\n", pa_start, map_start);
     /* align start addresses */
     map_start &= ZEROETH_MAP_MASK;
     pa_start &= ZEROETH_MAP_MASK;
@@ -758,7 +792,7 @@ setup_initial_pagetables(pte_t *second, pte_t *first, pte_t *zeroeth,
             __linker_address =                                                 \
                 __linker_address - linker_addr_start + load_addr_start;        \
         }                                                                      \
-        __linker_address;                                                      \
+        __linker_address;                                               \
     })
 
 /* Convert boot-time Xen address from where it was loaded by the boot loader to the address it was layed out
@@ -795,8 +829,10 @@ _setup_initial_pagetables(unsigned long load_addr_start,
     pte_t *first;
     pte_t *zeroeth;
 
-    clear_pagetables(load_addr_start, load_addr_end,
-                     linker_addr_start, linker_addr_end);
+    early_printk("load: %lx -> %lx, link: %lx -> %lx\n", load_addr_start, load_addr_end, linker_addr_start, linker_addr_end);
+
+//    clear_pagetables(load_addr_start, load_addr_end,
+//                     linker_addr_start, linker_addr_end);
 
     /* Get the addresses where the page tables were loaded */
     second = (pte_t *)load_addr(&xen_second_pagetable);
@@ -835,11 +871,13 @@ _setup_initial_pagetables(unsigned long load_addr_start,
                              linker_addr_end, load_addr_start);
 
     /* Ensure page table writes precede loading the SATP */
-    asm volatile("sfence.vma");
+    local_flush_tlb_all_asid(0);
+
+    early_printk("virt_to_maddr: %lx %lx (%p)\n", load_addr(xen_second_pagetable), __virt_to_maddr((unsigned long)xen_second_pagetable), xen_second_pagetable);
 
     /* Enable the MMU and load the new pagetable for Xen */
     csr_write(CSR_SATP,
-              (load_addr(xen_second_pagetable) >> PAGE_SHIFT) | SATP_MODE_SV39 << SATP_MODE_SHIFT);
+              (((paddr_t)xen_second_pagetable) >> PAGE_SHIFT) | (SATP_MODE_SV39 << SATP_MODE_SHIFT));
 
     phys_offset = load_addr_start - linker_addr_start;
 }
@@ -885,8 +923,8 @@ void __init setup_frametable_mappings(paddr_t ps, paddr_t pe)
         *second_pte = paddr_to_pte(mfn_to_maddr(first));
         second_pte->pte |= PTE_TABLE;
     }
-    
-    asm volatile("sfence.vma");
+
+    local_flush_tlb_all_asid(0);
 
     memset(&frame_table[0], 0, nr_pdxs * sizeof(struct page_info));
     memset(&frame_table[nr_pdxs], -1,
