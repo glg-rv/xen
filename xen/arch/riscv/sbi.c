@@ -31,7 +31,8 @@
 #include <asm/system.h>
 #include <asm/sbi.h>
 
-static unsigned long sbi_spec_version = SBI_SPEC_VERSION_DEFAULT;
+unsigned long sbi_spec_version = SBI_SPEC_VERSION_DEFAULT;
+unsigned long sbi_fw_id, sbi_fw_version;
 
 struct sbiret sbi_ecall(int ext, int fid, unsigned long arg0,
 			unsigned long arg1, unsigned long arg2,
@@ -457,8 +458,11 @@ int __init sbi_init(void)
 			sbi_major_version(), sbi_minor_version());
 
 	if (!sbi_spec_is_0_1()) {
+		sbi_fw_id = sbi_get_firmware_id();
+		sbi_fw_version = sbi_get_firmware_version();
+
 		printk("SBI implementation ID=0x%lx Version=0x%lx\n",
-			sbi_get_firmware_id(), sbi_get_firmware_version());
+			sbi_fw_id, sbi_fw_version);
 		if (sbi_probe_extension(SBI_EXT_TIME) > 0) {
 			__sbi_set_timer = __sbi_set_timer_v02;
 			printk("SBI v0.2 TIME extension detected\n");

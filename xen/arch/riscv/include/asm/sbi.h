@@ -86,6 +86,8 @@
 
 struct cpumask;
 
+extern unsigned long sbi_spec_version;
+extern unsigned long sbi_fw_id, sbi_fw_version;
 struct sbiret {
 	long error;
 	long value;

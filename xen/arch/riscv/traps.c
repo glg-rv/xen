@@ -209,6 +209,37 @@ static void guest_sbi_putchar(struct cpu_user_regs *regs)
     regs->a0 = 0;
 }
 
+static void guest_sbi_ext_base(struct cpu_user_regs *regs)
+{
+    unsigned long fid = regs->a6;
+
+    switch (fid)
+    {
+    case SBI_EXT_BASE_GET_SPEC_VERSION:
+        regs->a0 = 0;
+        regs->a1 = sbi_spec_version;
+        break;
+    case SBI_EXT_BASE_GET_IMP_ID:
+        regs->a0 = 0;
+        regs->a1 = sbi_fw_id;
+        break;
+    case SBI_EXT_BASE_GET_IMP_VERSION:
+        regs->a0 = 0;
+        regs->a1 = sbi_fw_version;
+        break;
+    case SBI_EXT_BASE_PROBE_EXT:
+        regs->a1 = sbi_probe_extension(regs->a0);
+        regs->a0 = 0;
+        break;
+
+    default:
+        printk("%s: Unsupport FID #%ld\n", __func__, fid);
+        regs->a0 = SBI_ERR_NOT_SUPPORTED;
+        break;
+    }
+}
+
+
 static void handle_guest_sbi(struct cpu_user_regs *regs)
 {
     unsigned long eid = regs->a7;
@@ -257,7 +288,7 @@ static void handle_guest_sbi(struct cpu_user_regs *regs)
         regs->a0 = SBI_ERR_NOT_SUPPORTED;
         break;
     case SBI_EXT_BASE:
-        regs->a0 = SBI_ERR_NOT_SUPPORTED;
+        guest_sbi_ext_base(regs);
         break;
     default:
         printk("UNKNOWN Guest SBI extension id 0x%lx\n", eid);
