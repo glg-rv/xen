@@ -246,6 +246,7 @@ static void handle_guest_sbi(struct cpu_user_regs *regs)
 
     switch ( eid )
     {
+    case SBI_EXT_TIME:
     case SBI_EXT_0_1_SET_TIMER:
         guest_sbi_set_timer(regs);
         break;
@@ -291,7 +292,7 @@ static void handle_guest_sbi(struct cpu_user_regs *regs)
         guest_sbi_ext_base(regs);
         break;
     default:
-        printk("UNKNOWN Guest SBI extension id 0x%lx\n", eid);
+        printk("UNKNOWN Guest SBI extension id 0x%lx, FID #%lu\n", eid, regs->a1);
         regs->a0 = SBI_ERR_NOT_SUPPORTED;
         break;
     };
