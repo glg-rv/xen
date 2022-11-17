@@ -244,6 +244,54 @@ static void guest_sbi_ext_base(struct cpu_user_regs *regs)
     }
 }
 
+static inline void riscv_cpuid_to_hartid_mask(const struct cpumask *in,
+					      struct cpumask *out)
+{
+	cpumask_clear(out);
+	cpumask_set_cpu(0, out);
+}
+
+static void guest_sbi_rfence(struct cpu_user_regs *regs)
+{
+    unsigned long fid = regs->a6;
+
+    switch (fid)
+    {
+    case SBI_EXT_RFENCE_REMOTE_FENCE_I:
+        {
+            unsigned long *hart_mask;
+            struct cpumask tmask;
+
+            riscv_cpuid_to_hartid_mask(&cpu_online_map, &tmask);
+		    hart_mask = cpumask_bits(&tmask);
+
+            sbi_remote_fence_i(hart_mask);
+
+            regs->a0 = 0;
+            break;
+        }
+    case SBI_EXT_RFENCE_REMOTE_SFENCE_VMA:
+        {
+            unsigned long *hart_mask;
+            struct cpumask tmask;
+
+            printk("start -> 0x%lx, size -> %lu\n", regs->a2, regs->a3);
+
+            riscv_cpuid_to_hartid_mask(&cpu_online_map, &tmask);
+		    hart_mask = cpumask_bits(&tmask);
+
+            sbi_remote_sfence_vma(hart_mask, regs->a2, regs->a3);
+            regs->a0 = 0;
+            break;
+        }
+
+    default:
+        printk("%s: Unsupport FID #%ld\n", __func__, fid);
+        regs->a0 = SBI_ERR_NOT_SUPPORTED;
+        break;
+    }
+}
+
 
 static void handle_guest_sbi(struct cpu_user_regs *regs)
 {
@@ -293,6 +341,9 @@ static void handle_guest_sbi(struct cpu_user_regs *regs)
         break;
     case SBI_EXT_BASE:
         guest_sbi_ext_base(regs);
+        break;
+    case SBI_EXT_RFENCE:
+        guest_sbi_rfence(regs);
         break;
     default:
         printk("UNKNOWN Guest SBI extension id 0x%lx, FID #%lu\n", eid, regs->a1);
