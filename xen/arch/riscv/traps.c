@@ -209,6 +209,11 @@ static void guest_sbi_putchar(struct cpu_user_regs *regs)
     regs->a0 = 0;
 }
 
+static void guest_sbi_getchar(struct cpu_user_regs *regs)
+{
+    regs->a0 = sbi_console_getchar();
+}
+
 static void guest_sbi_ext_base(struct cpu_user_regs *regs)
 {
     unsigned long fid = regs->a6;
@@ -254,9 +259,7 @@ static void handle_guest_sbi(struct cpu_user_regs *regs)
         guest_sbi_putchar(regs);
         break;
     case SBI_EXT_0_1_CONSOLE_GETCHAR:
-        printk("%s:%d: unimplemented: SBI_EXT_0_1_CONSOLE_GETCHAR\n",
-               __FILE__, __LINE__);
-        regs->a0 = SBI_ERR_NOT_SUPPORTED;
+        guest_sbi_getchar(regs);
         break;
     case SBI_EXT_0_1_CLEAR_IPI:
         printk("%s:%d: unimplemented: SBI_EXT_0_1_CLEAR_IPI\n",
