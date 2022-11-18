@@ -259,29 +259,16 @@ static void guest_sbi_rfence(struct cpu_user_regs *regs)
     {
     case SBI_EXT_RFENCE_REMOTE_FENCE_I:
         {
-            unsigned long *hart_mask;
-            struct cpumask tmask;
+            printk("SBI_EXT_RFENCE_REMOTE_FENCE_I is unsupported\n");
 
-            riscv_cpuid_to_hartid_mask(&cpu_online_map, &tmask);
-		    hart_mask = cpumask_bits(&tmask);
-
-            sbi_remote_fence_i(hart_mask);
-
-            regs->a0 = 0;
+            regs->a0 = SBI_ERR_NOT_SUPPORTED;
             break;
         }
     case SBI_EXT_RFENCE_REMOTE_SFENCE_VMA:
         {
-            unsigned long *hart_mask;
-            struct cpumask tmask;
+            printk("SBI_EXT_RFENCE_REMOTE_SFENCE_VMA is unsupported\n");
 
-            printk("start -> 0x%lx, size -> %lu\n", regs->a2, regs->a3);
-
-            riscv_cpuid_to_hartid_mask(&cpu_online_map, &tmask);
-		    hart_mask = cpumask_bits(&tmask);
-
-            sbi_remote_sfence_vma(hart_mask, regs->a2, regs->a3);
-            regs->a0 = 0;
+            regs->a0 = SBI_ERR_NOT_SUPPORTED;
             break;
         }
 
