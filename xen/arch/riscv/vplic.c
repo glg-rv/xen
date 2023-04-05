@@ -1,3 +1,7 @@
+
+#include <xen/types.h>
+#include <xen/sched.h>
+
 #include <asm/vplic.h>
 #include <asm/setup.h>
 

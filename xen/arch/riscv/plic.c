@@ -20,7 +20,9 @@
  * GNU General Public License for more details.
  */
 
+#include <xen/init.h>
 #include <xen/errno.h>
+
 #include <asm/device.h>
 #include <asm/plic.h>
 #include <asm/vplic.h>
