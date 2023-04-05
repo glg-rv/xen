@@ -4,7 +4,7 @@
 #ifndef __ASSEMBLY__
 
 #include <xen/cache.h>
-#include <xen/sched.h>
+#include <xen/timer.h>
 #include <asm/page.h>
 #include <asm/p2m.h>
 #include <asm/vplic.h>
