@@ -339,6 +339,17 @@ struct page_info *get_page_from_gfn(struct domain *d, unsigned long gfn,
     return page;
 }
 
+int arch_set_paging_mempool_size(struct domain *d, uint64_t size)
+{
+    return -EOPNOTSUPP;
+}
+
+/* Return the size of the pool, in bytes. */
+int arch_get_paging_mempool_size(struct domain *d, uint64_t *size)
+{
+    return -EOPNOTSUPP;
+}
+
 int set_foreign_p2m_entry(struct domain *d, const struct domain *fd,
                           unsigned long gfn, mfn_t mfn)
 {
