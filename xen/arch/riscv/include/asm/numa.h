@@ -5,6 +5,8 @@
 
 typedef u8 nodeid_t;
 
+#ifndef CONFIG_NUMA
+
 /* Fake one node for now. See also node_online_map. */
 #define cpu_to_node(cpu) 0
 #define node_to_cpumask(node)   (cpu_online_map)
@@ -29,6 +31,10 @@ static inline unsigned int arch_get_dma_bitsize(void)
 {
     return 32;
 }
+
+#endif
+
+#define arch_want_default_dmazone() (false)
 
 #endif /* __ARCH_RISCV_NUMA_H */
 /*

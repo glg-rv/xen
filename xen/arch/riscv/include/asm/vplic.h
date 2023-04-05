@@ -1,14 +1,14 @@
 #ifndef __ASM_VPLIC_H__
 #define __ASM_VPLIC_H__
 
+#include <xen/types.h>
 #include <asm/processor.h>
-#include <xen/sched.h>
 
 #define MAX_SOURCES 1024
 #define MAX_CONTEXTS 15872
 
 struct context {
-    u32 enable[MAX_SOURCES/32];
+    uint32_t enable[MAX_SOURCES/32];
 };
 
 struct vplic {
