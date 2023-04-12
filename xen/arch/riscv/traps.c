@@ -196,6 +196,28 @@ static void dump_csrs(unsigned long cause)
         wait_for_interrupt();
 }
 
+static void guest_sbi_probe_extension(struct cpu_user_regs *regs)
+{
+  int p;
+
+  switch (regs->a0)
+    {
+    case SBI_EXT_0_1_SET_TIMER:
+    case SBI_EXT_0_1_CONSOLE_PUTCHAR:
+    case SBI_EXT_0_1_CONSOLE_GETCHAR:
+    case SBI_EXT_BASE:
+    case SBI_EXT_TIME:
+      p = 1;
+      break;
+    default:
+      p = 0;
+      break;
+    }
+
+  regs->a1 = p;
+  regs->a0 = 0;
+}
+
 static void guest_sbi_set_timer(struct cpu_user_regs *regs)
 {
     struct vcpu *v = current;
@@ -233,8 +255,7 @@ static void guest_sbi_ext_base(struct cpu_user_regs *regs)
         regs->a1 = sbi_fw_version;
         break;
     case SBI_EXT_BASE_PROBE_EXT:
-        regs->a1 = sbi_probe_extension(regs->a0);
-        regs->a0 = 0;
+        guest_sbi_probe_extension(regs);
         break;
 
     default:
